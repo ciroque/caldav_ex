@@ -1,0 +1,35 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads dependencies sources to.
+/deps/
+
+# Where third-party dependencies like ExDoc output generated docs.
+/doc/
+
+# Ignore package tarballs.
+/*.ez
+/*.tar
+
+# Temporary files.
+/tmp/
+
+# Erlang VM crash dumps.
+erl_crash.dump
+
+# Environment files.
+.env
+.env.*
+!.env.example
+
+# Editor and IDE files.
+/.idea/
+*.iml
+.vscode/
+
+# OS generated files.
+.DS_Store
+Thumbs.db
