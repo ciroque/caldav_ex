@@ -1,32 +1,37 @@
 defmodule CalDAVEx.Calendar do
-  alias CalDAVEx.{HTTP, Types.Calendar, Error}
+  alias CalDAVEx.{HTTP, Types.Calendar, XML}
 
-  def list(client, _discovery_info) do
+  def list(client, discovery_info) do
     xml = """
     <?xml version="1.0" encoding="UTF-8"?>
-    <D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+    <D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:CS="http://calendarserver.org/ns/">
       <D:prop>
         <D:displayname/>
         <C:calendar-description/>
-        <D:getctag/>
+        <CS:getctag/>
       </D:prop>
     </D:propfind>
     """
 
-    url = client.config.base_url <> "/calendars/"
+    url = discovery_info.calendar_home_set_url
 
     case HTTP.request(client, :propfind, url, [{"depth", "1"}], xml) do
       {:ok, %{body: body}} ->
-        # TODO: Proper XML parsing (Saxy) - for now return placeholder
-        calendars = [
-          %Calendar{
-            url: url <> "personal/",
-            display_name: "Personal",
-            description: "",
-            ctag: nil
-          }
-        ]
-        {:ok, calendars}
+        with {:ok, responses} <- XML.parse_multistatus(body, client.config.base_url) do
+          calendars =
+            responses
+            |> Enum.filter(& &1.href)
+            |> Enum.map(fn response ->
+              %Calendar{
+                url: response.href,
+                display_name: response.display_name,
+                description: response.description,
+                ctag: response.ctag
+              }
+            end)
+
+          {:ok, calendars}
+        end
 
       error ->
         error

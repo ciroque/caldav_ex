@@ -21,7 +21,7 @@ defmodule CalDAVEx do
   def list_calendars(client, discovery_info), do: Calendar.list(client, discovery_info)
 
   # Events
-  def list_events(client, calendar_url), do: Event.list(client, calendar_url)
+  def list_events(client, calendar_url, opts \\ []), do: Event.list(client, calendar_url, opts)
   def get_event(client, event_url), do: Event.get(client, event_url)
 
   def create_event(client, calendar_url, filename, ics_data),

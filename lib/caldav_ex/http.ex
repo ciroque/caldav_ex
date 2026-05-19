@@ -1,6 +1,4 @@
 defmodule CalDAVEx.HTTP do
-  alias CalDAVEx.Config
-
   def request(client, method, url, headers \\ [], body \\ nil) do
     cfg = client.config
 

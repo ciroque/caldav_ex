@@ -8,6 +8,6 @@ defmodule CalDAVEx.Types do
   end
 
   defmodule Event do
-    defstruct [:href, :etag, :calendar_data, :content_type]
+    defstruct [:href, :etag, :calendar_data, :content_type, :summary, :dtstart, :dtend]
   end
 end
