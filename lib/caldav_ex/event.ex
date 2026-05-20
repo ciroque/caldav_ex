@@ -117,7 +117,10 @@ defmodule CalDAVEx.Event do
   end
 
   defp get_header(headers, key) do
-    headers
-    |> Enum.find_value(fn {k, v} -> if String.downcase(k) == key, do: v end)
+    case Enum.find_value(headers, fn {k, v} -> if String.downcase(k) == key, do: v end) do
+      [value | _] -> value
+      value when is_binary(value) -> value
+      _ -> nil
+    end
   end
 end
