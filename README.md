@@ -9,6 +9,9 @@ Elixir CalDAV client library for calendar and event management.
 
 CalDAVEx provides a clean, idiomatic Elixir interface to CalDAV servers with robust XML parsing, iCalendar support, and comprehensive event filtering.
 
+## Acknowledgments
+
+This project was inspired by the [caldav_cleam](https://github.com/RedHelium/caldav_gleam) project, and modeled after the [python-caldav](https://github.com/python-caldav/caldav) library.
 
 
 ## Features
