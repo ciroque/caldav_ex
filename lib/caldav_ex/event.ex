@@ -149,21 +149,43 @@ defmodule CalDAVEx.Event do
   end
 
   defp extract_rrule(%{rrule: %ICal.Recurrence{} = rrule}), do: format_rrule(rrule)
-  defp extract_rrule(%{rrule: rrule}) when is_binary(rrule), do: rrule
   defp extract_rrule(_), do: nil
 
   defp format_rrule(%ICal.Recurrence{} = rrule) do
-    parts = []
-    parts = if rrule.frequency, do: ["FREQ=#{String.upcase(to_string(rrule.frequency))}" | parts], else: parts
-    parts = if rrule.interval && rrule.interval != 1, do: ["INTERVAL=#{rrule.interval}" | parts], else: parts
-    parts = if rrule.count, do: ["COUNT=#{rrule.count}" | parts], else: parts
-    parts = if rrule.until, do: ["UNTIL=#{format_until(rrule.until)}" | parts], else: parts
-    parts = if rrule.by_day && rrule.by_day != [], do: ["BYDAY=#{format_by_day(rrule.by_day)}" | parts], else: parts
-    parts = if rrule.by_month_day, do: ["BYMONTHDAY=#{Enum.join(rrule.by_month_day, ",")}" | parts], else: parts
-    parts = if rrule.by_month, do: ["BYMONTH=#{Enum.join(rrule.by_month, ",")}" | parts], else: parts
-
-    Enum.reverse(parts) |> Enum.join(";")
+    []
+    |> add_frequency(rrule.frequency)
+    |> add_interval(rrule.interval)
+    |> add_count(rrule.count)
+    |> add_until(rrule.until)
+    |> add_by_day(rrule.by_day)
+    |> add_by_month_day(rrule.by_month_day)
+    |> add_by_month(rrule.by_month)
+    |> Enum.reverse()
+    |> Enum.join(";")
   end
+
+  defp add_frequency(parts, nil), do: parts
+  defp add_frequency(parts, frequency), do: ["FREQ=#{String.upcase(to_string(frequency))}" | parts]
+
+  defp add_interval(parts, nil), do: parts
+  defp add_interval(parts, 1), do: parts
+  defp add_interval(parts, interval), do: ["INTERVAL=#{interval}" | parts]
+
+  defp add_count(parts, nil), do: parts
+  defp add_count(parts, count), do: ["COUNT=#{count}" | parts]
+
+  defp add_until(parts, nil), do: parts
+  defp add_until(parts, until), do: ["UNTIL=#{format_until(until)}" | parts]
+
+  defp add_by_day(parts, nil), do: parts
+  defp add_by_day(parts, []), do: parts
+  defp add_by_day(parts, by_day), do: ["BYDAY=#{format_by_day(by_day)}" | parts]
+
+  defp add_by_month_day(parts, nil), do: parts
+  defp add_by_month_day(parts, by_month_day), do: ["BYMONTHDAY=#{Enum.join(by_month_day, ",")}" | parts]
+
+  defp add_by_month(parts, nil), do: parts
+  defp add_by_month(parts, by_month), do: ["BYMONTH=#{Enum.join(by_month, ",")}" | parts]
 
   defp format_until(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y%m%dT%H%M%SZ")
   defp format_until(%Date{} = d), do: Calendar.strftime(d, "%Y%m%d")
@@ -182,13 +204,14 @@ defmodule CalDAVEx.Event do
 
   defp extract_status(_), do: nil
 
-  defp extract_organizer(%{organizer: organizer}) when is_binary(organizer) and not is_nil(organizer) do
+  defp extract_organizer(%{organizer: organizer})
+       when is_binary(organizer) and not is_nil(organizer) do
     organizer
   end
 
   defp extract_organizer(_), do: nil
 
-  defp extract_attendees(%{attendees: attendees}) when is_list(attendees) do
+  defp extract_attendees(%{attendees: attendees}) do
     Enum.map(attendees, fn
       %ICal.Attendee{name: name} -> name
       name when is_binary(name) -> name
@@ -197,8 +220,6 @@ defmodule CalDAVEx.Event do
     |> Enum.reject(&is_nil/1)
   end
 
-  defp extract_attendees(_), do: []
-
   defp parse_calendar(calendar_data) do
     ICal.from_ics(calendar_data)
   rescue
@@ -206,10 +227,12 @@ defmodule CalDAVEx.Event do
   end
 
   defp get_header(headers, key) do
-    case Enum.find_value(headers, fn {k, v} -> if String.downcase(k) == key, do: v end) do
-      [value | _] -> value
-      value when is_binary(value) -> value
-      _ -> nil
-    end
+    headers
+    |> Enum.find_value(fn {k, v} -> if String.downcase(k) == key, do: v end)
+    |> normalize_header_value()
   end
+
+  defp normalize_header_value([value | _]), do: value
+  defp normalize_header_value(value) when is_binary(value), do: value
+  defp normalize_header_value(_), do: nil
 end

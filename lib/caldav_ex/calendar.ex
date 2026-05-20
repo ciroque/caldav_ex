@@ -23,24 +23,28 @@ defmodule CalDAVEx.Calendar do
     case HTTP.request(client, :propfind, url, [{"depth", "1"}], xml) do
       {:ok, %{body: body}} ->
         with {:ok, responses} <- XML.parse_multistatus(body, client.config.base_url) do
-          calendars =
-            responses
-            |> Enum.filter(&(&1.href && &1.is_calendar))
-            |> Enum.map(fn response ->
-              %Calendar{
-                url: response.href,
-                display_name: response.display_name,
-                description: response.description,
-                ctag: response.ctag,
-                is_calendar: response.is_calendar
-              }
-            end)
-
+          calendars = build_calendars(responses)
           {:ok, calendars}
         end
 
       error ->
         error
     end
+  end
+
+  defp build_calendars(responses) do
+    responses
+    |> Enum.filter(&(&1.href && &1.is_calendar))
+    |> Enum.map(&response_to_calendar/1)
+  end
+
+  defp response_to_calendar(response) do
+    %Calendar{
+      url: response.href,
+      display_name: response.display_name,
+      description: response.description,
+      ctag: response.ctag,
+      is_calendar: response.is_calendar
+    }
   end
 end

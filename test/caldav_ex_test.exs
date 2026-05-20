@@ -68,7 +68,9 @@ defmodule CalDAVExTest do
       |> CalDAVEx.new_client()
 
     ics_data = "BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR"
-    assert {:ok, _} = CalDAVEx.create_event(client, base_url <> "/calendars/test/", "event.ics", ics_data)
+
+    assert {:ok, _} =
+             CalDAVEx.create_event(client, base_url <> "/calendars/test/", "event.ics", ics_data)
   end
 
   test "update_event calls Event.update" do
@@ -89,7 +91,9 @@ defmodule CalDAVExTest do
       |> CalDAVEx.new_client()
 
     ics_data = "BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR"
-    assert {:ok, _} = CalDAVEx.update_event(client, base_url <> "/calendars/test/event.ics", ics_data)
+
+    assert {:ok, _} =
+             CalDAVEx.update_event(client, base_url <> "/calendars/test/event.ics", ics_data)
   end
 
   test "update_event with etag calls Event.update with etag" do
@@ -110,7 +114,14 @@ defmodule CalDAVExTest do
       |> CalDAVEx.new_client()
 
     ics_data = "BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR"
-    assert {:ok, _} = CalDAVEx.update_event(client, base_url <> "/calendars/test/event.ics", ics_data, "\"etag-123\"")
+
+    assert {:ok, _} =
+             CalDAVEx.update_event(
+               client,
+               base_url <> "/calendars/test/event.ics",
+               ics_data,
+               "\"etag-123\""
+             )
   end
 
   test "delete_event calls Event.delete" do
@@ -150,7 +161,12 @@ defmodule CalDAVExTest do
       |> CalDAVEx.new_config(CalDAVEx.no_auth())
       |> CalDAVEx.new_client()
 
-    assert {:ok, _} = CalDAVEx.delete_event(client, base_url <> "/calendars/test/event.ics", "\"etag-456\"")
+    assert {:ok, _} =
+             CalDAVEx.delete_event(
+               client,
+               base_url <> "/calendars/test/event.ics",
+               "\"etag-456\""
+             )
   end
 
   test "discover calls Discovery.discover" do

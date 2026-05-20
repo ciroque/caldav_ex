@@ -259,7 +259,7 @@ defmodule CalDAVEx do
   - `ics_data` - The iCalendar data as a string
   """
   def create_event(client, calendar_url, filename, ics_data),
-      do: Event.create(client, calendar_url, filename, ics_data)
+    do: Event.create(client, calendar_url, filename, ics_data)
 
   @doc """
   Updates an existing event.
@@ -274,7 +274,7 @@ defmodule CalDAVEx do
   - `etag` - Optional ETag for optimistic locking
   """
   def update_event(client, event_url, ics_data, etag \\ nil),
-      do: Event.update(client, event_url, ics_data, etag)
+    do: Event.update(client, event_url, ics_data, etag)
 
   @doc """
   Deletes an event.
@@ -288,7 +288,7 @@ defmodule CalDAVEx do
   - `etag` - Optional ETag for optimistic locking
   """
   def delete_event(client, event_url, etag \\ nil),
-      do: Event.delete(client, event_url, etag)
+    do: Event.delete(client, event_url, etag)
 
   @doc """
   Converts a CalDAVEx.Error to a human-readable string.

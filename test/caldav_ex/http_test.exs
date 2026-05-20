@@ -202,7 +202,9 @@ defmodule CalDAVEx.HTTPTest do
       |> CalDAVEx.new_config(CalDAVEx.no_auth())
       |> CalDAVEx.new_client()
 
-    assert {:error, error} = HTTP.request(client, :get, "http://invalid-host-that-does-not-exist-12345.local")
+    assert {:error, error} =
+             HTTP.request(client, :get, "http://invalid-host-that-does-not-exist-12345.local")
+
     assert error.type == :transport
   end
 end

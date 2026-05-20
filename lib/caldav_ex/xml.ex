@@ -6,15 +6,17 @@ defmodule CalDAVEx.XML do
   alias CalDAVEx.Error
 
   def parse_multistatus(body, base_url) do
-    with {:ok, document} <- Saxy.SimpleForm.parse_string(body, cdata_as_characters: true) do
-      responses =
-        document
-        |> children_named("response")
-        |> Enum.map(&parse_response(&1, base_url))
+    case Saxy.SimpleForm.parse_string(body, cdata_as_characters: true) do
+      {:ok, document} ->
+        responses =
+          document
+          |> children_named("response")
+          |> Enum.map(&parse_response(&1, base_url))
 
-      {:ok, responses}
-    else
-      {:error, error} -> {:error, Error.xml(Exception.message(error))}
+        {:ok, responses}
+
+      {:error, error} ->
+        {:error, Error.xml(Exception.message(error))}
     end
   end
 

@@ -187,8 +187,8 @@ defmodule CalDAVEx.XMLTest do
         <D:propstat>
           <D:prop>
             <C:calendar-data><![CDATA[BEGIN:VCALENDAR
-VERSION:2.0
-END:VCALENDAR]]></C:calendar-data>
+    VERSION:2.0
+    END:VCALENDAR]]></C:calendar-data>
           </D:prop>
           <D:status>HTTP/1.1 200 OK</D:status>
         </D:propstat>
