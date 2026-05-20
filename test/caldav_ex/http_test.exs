@@ -126,4 +126,83 @@ defmodule CalDAVEx.HTTPTest do
 
     assert {:ok, _} = HTTP.request(client, :get, base_url)
   end
+
+  test "includes bearer auth header" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      [auth_header] = Plug.Conn.get_req_header(conn, "authorization")
+      assert auth_header == "Bearer test-token-123"
+      Plug.Conn.resp(conn, 200, "")
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.bearer_auth("test-token-123"))
+      |> CalDAVEx.new_client()
+
+    assert {:ok, _} = HTTP.request(client, :get, base_url)
+  end
+
+  test "converts PROPPATCH method" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      assert "PROPPATCH" == conn.method
+      Plug.Conn.resp(conn, 200, "")
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, _} = HTTP.request(client, :proppatch, base_url)
+  end
+
+  test "converts MKCALENDAR method" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      assert "MKCALENDAR" == conn.method
+      Plug.Conn.resp(conn, 200, "")
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, _} = HTTP.request(client, :mkcalendar, base_url)
+  end
+
+  test "converts REPORT method" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      assert "REPORT" == conn.method
+      Plug.Conn.resp(conn, 200, "")
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, _} = HTTP.request(client, :report, base_url)
+  end
+
+  test "handles transport errors" do
+    client =
+      "http://invalid-host-that-does-not-exist-12345.local"
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:error, error} = HTTP.request(client, :get, "http://invalid-host-that-does-not-exist-12345.local")
+    assert error.type == :transport
+  end
 end

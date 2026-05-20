@@ -156,4 +156,59 @@ defmodule CalDAVEx.CalendarTest do
     assert length(calendars) == 1
     assert [%Calendar{display_name: "Personal", is_calendar: true}] = calendars
   end
+
+  test "filters out responses without href" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:propstat>
+            <D:prop>
+              <D:displayname>No Href Calendar</D:displayname>
+              <D:resourcetype>
+                <D:collection/>
+                <C:calendar/>
+              </D:resourcetype>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+        <D:response>
+          <D:href>/calendars/user/valid/</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:displayname>Valid Calendar</D:displayname>
+              <D:resourcetype>
+                <D:collection/>
+                <C:calendar/>
+              </D:resourcetype>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    discovery_info = %DiscoveryInfo{
+      principal_url: base_url <> "/principals/user/",
+      calendar_home_set_url: base_url <> "/calendars/user/"
+    }
+
+    assert {:ok, calendars} = CalDAVEx.Calendar.list(client, discovery_info)
+
+    assert length(calendars) == 1
+    assert [%Calendar{display_name: "Valid Calendar"}] = calendars
+  end
 end

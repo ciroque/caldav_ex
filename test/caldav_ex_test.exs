@@ -152,4 +152,160 @@ defmodule CalDAVExTest do
 
     assert {:ok, _} = CalDAVEx.delete_event(client, base_url <> "/calendars/test/event.ics", "\"etag-456\"")
   end
+
+  test "discover calls Discovery.discover" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect(bypass, fn conn ->
+      case conn.request_path do
+        "/" ->
+          conn
+          |> Plug.Conn.put_resp_content_type("application/xml")
+          |> Plug.Conn.resp(207, """
+          <?xml version="1.0" encoding="UTF-8"?>
+          <D:multistatus xmlns:D="DAV:">
+            <D:response>
+              <D:href>/</D:href>
+              <D:propstat>
+                <D:prop>
+                  <D:current-user-principal>
+                    <D:href>/principals/user/</D:href>
+                  </D:current-user-principal>
+                </D:prop>
+                <D:status>HTTP/1.1 200 OK</D:status>
+              </D:propstat>
+            </D:response>
+          </D:multistatus>
+          """)
+
+        "/principals/user/" ->
+          conn
+          |> Plug.Conn.put_resp_content_type("application/xml")
+          |> Plug.Conn.resp(207, """
+          <?xml version="1.0" encoding="UTF-8"?>
+          <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+            <D:response>
+              <D:href>/principals/user/</D:href>
+              <D:propstat>
+                <D:prop>
+                  <C:calendar-home-set>
+                    <D:href>/calendars/user/</D:href>
+                  </C:calendar-home-set>
+                </D:prop>
+                <D:status>HTTP/1.1 200 OK</D:status>
+              </D:propstat>
+            </D:response>
+          </D:multistatus>
+          """)
+      end
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, discovery_info} = CalDAVEx.discover(client)
+    assert discovery_info.principal_url == base_url <> "/principals/user/"
+    assert discovery_info.calendar_home_set_url == base_url <> "/calendars/user/"
+  end
+
+  test "list_calendars calls Calendar.list" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      assert "PROPFIND" == conn.method
+      assert "/calendars/user/" == conn.request_path
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/work/</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:displayname>Work</D:displayname>
+              <D:resourcetype><D:collection/><C:calendar/></D:resourcetype>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    discovery_info = %CalDAVEx.Types.DiscoveryInfo{
+      principal_url: base_url <> "/principals/user/",
+      calendar_home_set_url: base_url <> "/calendars/user/"
+    }
+
+    assert {:ok, [calendar]} = CalDAVEx.list_calendars(client, discovery_info)
+    assert calendar.display_name == "Work"
+  end
+
+  test "list_events calls Event.list" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      assert "REPORT" == conn.method
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/work/event.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;e1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#10;VERSION:2.0&#10;BEGIN:VEVENT&#10;UID:e1&#10;SUMMARY:Meeting&#10;DTSTART:20250520T140000Z&#10;DTEND:20250520T150000Z&#10;END:VEVENT&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.list_events(client, base_url <> "/calendars/user/work/")
+    assert event.summary == "Meeting"
+  end
+
+  test "get_event calls Event.get" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      assert "GET" == conn.method
+
+      conn
+      |> Plug.Conn.put_resp_header("etag", "\"e1\"")
+      |> Plug.Conn.put_resp_content_type("text/calendar")
+      |> Plug.Conn.resp(200, "BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR")
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, event} = CalDAVEx.get_event(client, base_url <> "/calendars/user/work/event.ics")
+    assert event.etag == "\"e1\""
+  end
 end

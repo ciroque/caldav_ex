@@ -177,4 +177,114 @@ defmodule CalDAVEx.XMLTest do
     assert {:ok, [response]} = XML.parse_multistatus(xml, "https://caldav.example.com")
     assert response.href == "https://other.example.com/cal/"
   end
+
+  test "handles CDATA in calendar data" do
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      <D:response>
+        <D:href>/calendars/user/event.ics</D:href>
+        <D:propstat>
+          <D:prop>
+            <C:calendar-data><![CDATA[BEGIN:VCALENDAR
+VERSION:2.0
+END:VCALENDAR]]></C:calendar-data>
+          </D:prop>
+          <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+      </D:response>
+    </D:multistatus>
+    """
+
+    assert {:ok, [response]} = XML.parse_multistatus(xml, "https://caldav.example.com")
+    assert response.calendar_data =~ "BEGIN:VCALENDAR"
+  end
+
+  test "identifies calendar resourcetype correctly" do
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      <D:response>
+        <D:href>/calendars/user/work/</D:href>
+        <D:propstat>
+          <D:prop>
+            <D:displayname>Work</D:displayname>
+            <D:resourcetype>
+              <D:collection/>
+              <C:calendar/>
+            </D:resourcetype>
+          </D:prop>
+          <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+      </D:response>
+    </D:multistatus>
+    """
+
+    assert {:ok, [response]} = XML.parse_multistatus(xml, "https://caldav.example.com")
+    assert response.is_calendar == true
+  end
+
+  test "handles resourcetype without calendar element" do
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <D:multistatus xmlns:D="DAV:">
+      <D:response>
+        <D:href>/files/document.txt</D:href>
+        <D:propstat>
+          <D:prop>
+            <D:displayname>Document</D:displayname>
+            <D:resourcetype>
+              <D:collection/>
+            </D:resourcetype>
+          </D:prop>
+          <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+      </D:response>
+    </D:multistatus>
+    """
+
+    assert {:ok, [response]} = XML.parse_multistatus(xml, "https://caldav.example.com")
+    assert response.is_calendar == false
+  end
+
+  test "handles missing resourcetype" do
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <D:multistatus xmlns:D="DAV:">
+      <D:response>
+        <D:href>/files/document.txt</D:href>
+        <D:propstat>
+          <D:prop>
+            <D:displayname>Document</D:displayname>
+          </D:prop>
+          <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+      </D:response>
+    </D:multistatus>
+    """
+
+    assert {:ok, [response]} = XML.parse_multistatus(xml, "https://caldav.example.com")
+    assert response.is_calendar == false
+  end
+
+  test "handles calendar description" do
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      <D:response>
+        <D:href>/calendars/user/work/</D:href>
+        <D:propstat>
+          <D:prop>
+            <D:displayname>Work</D:displayname>
+            <C:calendar-description>My work calendar</C:calendar-description>
+          </D:prop>
+          <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+      </D:response>
+    </D:multistatus>
+    """
+
+    assert {:ok, [response]} = XML.parse_multistatus(xml, "https://caldav.example.com")
+    assert response.description == "My work calendar"
+  end
 end
