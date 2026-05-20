@@ -9,21 +9,56 @@ This guide walks you through setting up GitHub Actions for CalDAVEx.
 
 ## Step 1: Configure Hex.pm API Key
 
-1. **Generate Hex API Key:**
-   - Go to https://hex.pm/settings/keys
-   - Click "Generate new key"
-   - Name: `github-actions-caldav_ex`
-   - Permissions: Check "API" (for publishing)
-   - Click "Generate"
-   - **Copy the key immediately** (you won't see it again)
+### 1.1 Generate Hex.pm API Key
 
-2. **Add Secret to GitHub:**
-   - Go to your repository on GitHub
-   - Settings → Secrets and variables → Actions
-   - Click "New repository secret"
-   - Name: `HEX_API_KEY`
-   - Value: Paste your Hex API key
-   - Click "Add secret"
+1. **Log in to Hex.pm:**
+   - Go to https://hex.pm
+   - Sign in with your account (create one if needed)
+
+2. **Navigate to API Keys:**
+   - Go to https://hex.pm/settings/keys
+   - Or: Click your profile → Settings → API keys
+
+3. **Generate New Key:**
+   - Click **"Generate new key"**
+   - **Name:** `github-actions-caldav_ex` (or any descriptive name)
+   - **Permissions:** Check **"API"** (required for publishing packages)
+   - Click **"Generate"**
+
+4. **Copy the Key:**
+   - **⚠️ CRITICAL:** Copy the API key immediately
+   - You will **never see this key again** after leaving the page
+   - Store it temporarily in a secure location (password manager recommended)
+
+### 1.2 Add Secret to GitHub Repository
+
+1. **Navigate to Repository Settings:**
+   - Go to https://github.com/ciroque/caldav_ex
+   - Click **Settings** tab (repository settings, not your profile)
+
+2. **Access Secrets:**
+   - In the left sidebar, expand **Secrets and variables**
+   - Click **Actions**
+
+3. **Create New Secret:**
+   - Click **"New repository secret"** button
+   - **Name:** `HEX_API_KEY` (must be exactly this, case-sensitive)
+   - **Value:** Paste the Hex.pm API key from step 1.1
+   - Click **"Add secret"**
+
+4. **Verify Secret Added:**
+   - You should see `HEX_API_KEY` in the list
+   - The value will be hidden (shows as `***`)
+   - Note the "Updated" timestamp
+
+### 1.3 Security Notes
+
+- ✅ Secret is encrypted and never exposed in workflow logs
+- ✅ Only accessible to workflows in this repository
+- ✅ Can be updated or rotated anytime
+- ✅ Revoke old keys on Hex.pm after updating
+- ⚠️ Never commit API keys to your repository
+- ⚠️ Never share API keys in issues or pull requests
 
 ## Step 2: Create Hex.pm Environment
 
@@ -96,14 +131,23 @@ This guide walks you through setting up GitHub Actions for CalDAVEx.
 5. **Verify Success:**
    - Check workflow completes successfully
    - Visit https://hex.pm/packages/caldav_ex
-   - Check GitHub Releases for new release
+   - Visit https://hexdocs.pm/caldav_ex (docs published automatically)
+   - Check GitHub Releases for new release with links
 
 ## Troubleshooting
 
 ### "HEX_API_KEY not found"
-- Verify secret name is exactly `HEX_API_KEY`
-- Check secret is in repository secrets, not environment secrets
-- Try regenerating the Hex API key
+- Verify secret name is exactly `HEX_API_KEY` (case-sensitive)
+- Check secret is in **repository secrets**, not environment secrets
+- Ensure you're looking at the correct repository
+- Try regenerating the Hex API key and updating the secret
+
+### "Authentication failed" or "Invalid API key"
+- API key may have been revoked on Hex.pm
+- Key may have expired (check Hex.pm settings)
+- Generate a new key on Hex.pm
+- Update the GitHub secret with the new key
+- Ensure "API" permission is checked when generating key
 
 ### "Version mismatch"
 - Ensure version in `mix.exs` matches tag (without 'v' prefix)
@@ -168,8 +212,42 @@ Dependencies are cached. To force refresh:
    - Tag triggers the publish workflow automatically
    - Never delete or force-push tags after publishing
 
+## Managing API Keys
+
+### Rotating Keys
+
+It's good practice to rotate API keys periodically:
+
+1. **Generate new key** on Hex.pm (Step 1.1)
+2. **Update GitHub secret** with new key (Step 1.2)
+3. **Revoke old key** on Hex.pm:
+   - Go to https://hex.pm/settings/keys
+   - Find the old key
+   - Click "Revoke"
+
+### Revoking Access
+
+If you need to immediately revoke publishing access:
+
+1. **Revoke on Hex.pm:**
+   - Go to https://hex.pm/settings/keys
+   - Click "Revoke" next to `github-actions-caldav_ex`
+
+2. **Delete from GitHub (optional):**
+   - Settings → Secrets and variables → Actions
+   - Click on `HEX_API_KEY`
+   - Click "Remove secret"
+
+### Multiple Repositories
+
+If you manage multiple packages:
+- Use **different API keys** for each repository
+- Name them descriptively (e.g., `github-actions-package-name`)
+- This allows fine-grained access control and easier revocation
+
 ## Support
 
 - GitHub Actions docs: https://docs.github.com/en/actions
 - Hex.pm publishing: https://hex.pm/docs/publish
+- Hex.pm API keys: https://hex.pm/docs/api_keys
 - Issues: https://github.com/ciroque/caldav_ex/issues

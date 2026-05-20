@@ -28,6 +28,7 @@
 - [ ] I have run `mix format` to format my code
 - [ ] I have run `mix credo --strict` and addressed all issues
 - [ ] I have run `mix dialyzer` and addressed all type warnings
+- [ ] I have run `mix docs` and verified documentation builds without errors
 - [ ] I have updated the CHANGELOG.md (if applicable)
 
 ## Testing

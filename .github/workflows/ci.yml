@@ -99,6 +99,15 @@ jobs:
       - name: Run Credo
         run: mix credo --strict
 
+      - name: Build documentation
+        run: mix docs
+
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: doc/
+
   dialyzer:
     name: Dialyzer
     runs-on: ubuntu-latest

@@ -51,7 +51,7 @@ defmodule CaldavEx.MixProject do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", "CHANGELOG.md"],
+      extras: ["README.md", "CHANGELOG.md", "LICENSE"],
       source_ref: "v#{@version}",
       source_url: @source_url
     ]

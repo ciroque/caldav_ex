@@ -17,6 +17,8 @@ This directory contains GitHub Actions workflows for CalDAVEx.
 2. **Code Quality** - Runs code quality checks
    - `mix format --check-formatted`
    - `mix credo --strict`
+   - `mix docs` - Builds documentation
+   - Uploads docs as artifact
 
 3. **Dialyzer** - Runs static analysis
    - Caches PLT files for faster runs
@@ -36,8 +38,9 @@ This directory contains GitHub Actions workflows for CalDAVEx.
 2. Extracts version from tag
 3. Validates version matches `mix.exs`
 4. Runs tests one final time
-5. Publishes to Hex.pm
-6. Creates GitHub release
+5. Builds documentation
+6. Publishes to Hex.pm (automatically publishes docs to HexDocs)
+7. Creates GitHub release with Hex.pm and HexDocs links
 
 **Usage:**
 1. Update version in `mix.exs`
@@ -81,6 +84,9 @@ mix format --check-formatted
 
 # Run Credo
 mix credo --strict
+
+# Build docs
+mix docs
 
 # Run Dialyzer
 mix dialyzer

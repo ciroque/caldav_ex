@@ -75,10 +75,13 @@ jobs:
       - name: Run tests
         run: mix test
 
+      - name: Build documentation
+        run: mix docs
+
       - name: Build package
         run: mix hex.build
 
-      - name: Publish to Hex.pm
+      - name: Publish to Hex.pm (includes docs)
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
         run: mix hex.publish --yes
@@ -93,7 +96,9 @@ jobs:
           body: |
             ## CalDAVEx ${{ github.ref_name }}
 
-            Published to Hex.pm: https://hex.pm/packages/caldav_ex/${{ steps.version.outputs.tag_version }}
+            **Package:** https://hex.pm/packages/caldav_ex/${{ steps.version.outputs.tag_version }}
+            
+            **Documentation:** https://hexdocs.pm/caldav_ex/${{ steps.version.outputs.tag_version }}
 
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
           draft: false
