@@ -74,6 +74,13 @@ defmodule CalDAVEx.Types do
     - `summary` - Event title/summary
     - `dtstart` - Start date/time (DateTime for timed events, Date for all-day events)
     - `dtend` - End date/time (DateTime for timed events, Date for all-day events)
+    - `uid` - Unique identifier for the event
+    - `description` - Detailed description of the event
+    - `location` - Location of the event
+    - `status` - Event status (e.g., "CONFIRMED", "TENTATIVE", "CANCELLED")
+    - `rrule` - Recurrence rule (RRULE) as a string
+    - `organizer` - Event organizer
+    - `attendees` - List of event attendees
     """
     @type t :: %__MODULE__{
             href: String.t(),
@@ -82,9 +89,31 @@ defmodule CalDAVEx.Types do
             content_type: String.t() | nil,
             summary: String.t() | nil,
             dtstart: DateTime.t() | Date.t() | nil,
-            dtend: DateTime.t() | Date.t() | nil
+            dtend: DateTime.t() | Date.t() | nil,
+            uid: String.t() | nil,
+            description: String.t() | nil,
+            location: String.t() | nil,
+            status: String.t() | nil,
+            rrule: String.t() | nil,
+            organizer: String.t() | nil,
+            attendees: list(String.t())
           }
 
-    defstruct [:href, :etag, :calendar_data, :content_type, :summary, :dtstart, :dtend]
+    defstruct [
+      :href,
+      :etag,
+      :calendar_data,
+      :content_type,
+      :summary,
+      :dtstart,
+      :dtend,
+      :uid,
+      :description,
+      :location,
+      :status,
+      :rrule,
+      :organizer,
+      attendees: []
+    ]
   end
 end

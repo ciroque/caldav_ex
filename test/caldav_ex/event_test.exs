@@ -108,4 +108,66 @@ defmodule CalDAVEx.EventTest do
     assert calendar_data =~ "SUMMARY:Team Standup"
     assert calendar_data =~ "UID:meeting-1@example.com"
   end
+
+  test "parses recurring events with extended fields" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      assert "REPORT" == conn.method
+      assert "/calendars/user/personal/" == conn.request_path
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/weekly-meeting.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;recurring-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#10;VERSION:2.0&#10;PRODID:-//Example//EN&#10;BEGIN:VEVENT&#10;UID:weekly-meeting-123&#10;SUMMARY:Weekly Team Sync&#10;DESCRIPTION:Discuss project progress and blockers&#10;LOCATION:Conference Room B&#10;STATUS:CONFIRMED&#10;DTSTART:20250520T140000Z&#10;DTEND:20250520T150000Z&#10;RRULE:FREQ=WEEKLY;BYDAY=TU&#10;ORGANIZER:mailto:manager@example.com&#10;ATTENDEE:mailto:alice@example.com&#10;ATTENDEE:mailto:bob@example.com&#10;END:VEVENT&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, events} = CalDAVEx.Event.list(client, calendar_url)
+
+    assert [event] = events
+
+    event_url = calendar_url <> "weekly-meeting.ics"
+
+    assert %Event{
+             href: ^event_url,
+             etag: "\"recurring-1\"",
+             summary: "Weekly Team Sync",
+             uid: "weekly-meeting-123",
+             description: "Discuss project progress and blockers",
+             location: "Conference Room B",
+             status: "CONFIRMED",
+             dtstart: ~U[2025-05-20 14:00:00Z],
+             dtend: ~U[2025-05-20 15:00:00Z],
+             rrule: rrule,
+             organizer: organizer,
+             attendees: attendees
+           } = event
+
+    assert rrule =~ "FREQ=WEEKLY"
+    assert rrule =~ "BYDAY=TU"
+    assert organizer == "mailto:manager@example.com"
+    assert length(attendees) == 2
+    assert "mailto:alice@example.com" in attendees
+    assert "mailto:bob@example.com" in attendees
+  end
 end

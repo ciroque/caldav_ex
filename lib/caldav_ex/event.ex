@@ -93,22 +93,107 @@ defmodule CalDAVEx.Event do
       calendar_data: response.calendar_data,
       summary: parsed.summary,
       dtstart: parsed.dtstart,
-      dtend: parsed.dtend
+      dtend: parsed.dtend,
+      uid: parsed.uid,
+      description: parsed.description,
+      location: parsed.location,
+      status: parsed.status,
+      rrule: parsed.rrule,
+      organizer: parsed.organizer,
+      attendees: parsed.attendees
     }
   end
 
   defp parse_ics(calendar_data) do
     case parse_calendar(calendar_data) do
       %ICal{events: [event | _]} ->
-        %{summary: event.summary, dtstart: event.dtstart, dtend: event.dtend}
+        extract_event_fields(event)
 
       {:ok, %ICal{events: [event | _]}} ->
-        %{summary: event.summary, dtstart: event.dtstart, dtend: event.dtend}
+        extract_event_fields(event)
 
       _ ->
-        %{summary: nil, dtstart: nil, dtend: nil}
+        empty_event_fields()
     end
   end
+
+  defp extract_event_fields(event) do
+    %{
+      summary: event.summary,
+      dtstart: event.dtstart,
+      dtend: event.dtend,
+      uid: event.uid,
+      description: event.description,
+      location: event.location,
+      status: extract_status(event),
+      rrule: extract_rrule(event),
+      organizer: extract_organizer(event),
+      attendees: extract_attendees(event)
+    }
+  end
+
+  defp empty_event_fields do
+    %{
+      summary: nil,
+      dtstart: nil,
+      dtend: nil,
+      uid: nil,
+      description: nil,
+      location: nil,
+      status: nil,
+      rrule: nil,
+      organizer: nil,
+      attendees: []
+    }
+  end
+
+  defp extract_rrule(%{rrule: rrule}) when is_binary(rrule), do: rrule
+  defp extract_rrule(%{rrule: %ICal.Recurrence{} = rrule}), do: format_rrule(rrule)
+  defp extract_rrule(_), do: nil
+
+  defp format_rrule(%ICal.Recurrence{} = rrule) do
+    parts = []
+    parts = if rrule.frequency, do: ["FREQ=#{String.upcase(to_string(rrule.frequency))}" | parts], else: parts
+    parts = if rrule.interval && rrule.interval != 1, do: ["INTERVAL=#{rrule.interval}" | parts], else: parts
+    parts = if rrule.count, do: ["COUNT=#{rrule.count}" | parts], else: parts
+    parts = if rrule.until, do: ["UNTIL=#{format_until(rrule.until)}" | parts], else: parts
+    parts = if rrule.by_day && rrule.by_day != [], do: ["BYDAY=#{format_by_day(rrule.by_day)}" | parts], else: parts
+    parts = if rrule.by_month_day, do: ["BYMONTHDAY=#{Enum.join(rrule.by_month_day, ",")}" | parts], else: parts
+    parts = if rrule.by_month, do: ["BYMONTH=#{Enum.join(rrule.by_month, ",")}" | parts], else: parts
+
+    Enum.reverse(parts) |> Enum.join(";")
+  end
+
+  defp format_until(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y%m%dT%H%M%SZ")
+  defp format_until(%Date{} = d), do: Calendar.strftime(d, "%Y%m%d")
+  defp format_until(_), do: ""
+
+  defp format_by_day(by_day) do
+    by_day
+    |> Enum.map(fn
+      {0, day} -> String.upcase(to_string(day)) |> String.slice(0, 2)
+      {n, day} -> "#{n}#{String.upcase(to_string(day)) |> String.slice(0, 2)}"
+    end)
+    |> Enum.join(",")
+  end
+
+  defp extract_status(%{status: status}) when is_atom(status), do: status |> to_string() |> String.upcase()
+  defp extract_status(%{status: status}) when is_binary(status), do: String.upcase(status)
+  defp extract_status(_), do: nil
+
+  defp extract_organizer(%{organizer: organizer}) when is_binary(organizer), do: organizer
+  defp extract_organizer(_), do: nil
+
+  defp extract_attendees(%{attendees: attendees}) when is_list(attendees) do
+    Enum.map(attendees, fn
+      %ICal.Attendee{name: name} -> name
+      name when is_binary(name) -> name
+      _ -> nil
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp extract_attendees(_), do: []
 
   defp parse_calendar(calendar_data) do
     ICal.from_ics(calendar_data)
