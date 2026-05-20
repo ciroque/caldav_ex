@@ -11,7 +11,7 @@ CalDAVEx provides a clean, idiomatic Elixir interface to CalDAV servers with rob
 
 ## Acknowledgments
 
-This project was inspired by the [caldav_cleam](https://github.com/RedHelium/caldav_gleam) project, and modeled after the [python-caldav](https://github.com/python-caldav/caldav) library.
+This project was inspired by the [caldav_gleam](https://github.com/RedHelium/caldav_gleam) project, and modeled after the [python-caldav](https://github.com/python-caldav/caldav) library.
 
 
 ## Features
