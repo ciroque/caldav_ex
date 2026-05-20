@@ -2,6 +2,8 @@
 
 [![Hex.pm](https://img.shields.io/hexpm/v/caldav_ex.svg)](https://hex.pm/packages/caldav_ex)
 [![Documentation](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/caldav_ex)
+[![CI](https://github.com/ciroque/caldav_ex/actions/workflows/ci.yml/badge.svg)](https://github.com/ciroque/caldav_ex/actions/workflows/ci.yml)
+[![License](https://img.shields.io/hexpm/l/caldav_ex.svg)](https://github.com/ciroque/caldav_ex/blob/main/LICENSE)
 
 Elixir CalDAV client library for calendar and event management.
 
