@@ -67,7 +67,7 @@ jobs:
 
       - name: Verify version matches mix.exs
         run: |
-          VERSION_IN_MIX=$(grep '@version' mix.exs | sed 's/.*"\(.*\)"/\1/')
+          VERSION_IN_MIX=$(grep '^  @version' mix.exs | sed 's/.*"\(.*\)"/\1/')
           TAG_VERSION=${{ steps.version.outputs.tag_version }}
           if [ "$VERSION_IN_MIX" != "$TAG_VERSION" ]; then
             echo "Error: Version in mix.exs ($VERSION_IN_MIX) does not match tag version ($TAG_VERSION)"
