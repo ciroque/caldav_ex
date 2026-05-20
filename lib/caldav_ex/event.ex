@@ -165,7 +165,9 @@ defmodule CalDAVEx.Event do
   end
 
   defp add_frequency(parts, nil), do: parts
-  defp add_frequency(parts, frequency), do: ["FREQ=#{String.upcase(to_string(frequency))}" | parts]
+
+  defp add_frequency(parts, frequency),
+    do: ["FREQ=#{String.upcase(to_string(frequency))}" | parts]
 
   defp add_interval(parts, nil), do: parts
   defp add_interval(parts, 1), do: parts
@@ -182,7 +184,9 @@ defmodule CalDAVEx.Event do
   defp add_by_day(parts, by_day), do: ["BYDAY=#{format_by_day(by_day)}" | parts]
 
   defp add_by_month_day(parts, nil), do: parts
-  defp add_by_month_day(parts, by_month_day), do: ["BYMONTHDAY=#{Enum.join(by_month_day, ",")}" | parts]
+
+  defp add_by_month_day(parts, by_month_day),
+    do: ["BYMONTHDAY=#{Enum.join(by_month_day, ",")}" | parts]
 
   defp add_by_month(parts, nil), do: parts
   defp add_by_month(parts, by_month), do: ["BYMONTH=#{Enum.join(by_month, ",")}" | parts]
