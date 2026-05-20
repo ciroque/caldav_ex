@@ -3,7 +3,7 @@ defmodule CalDAVEx.Discovery do
   CalDAV server discovery for principal and calendar home set URLs.
   """
 
-  alias CalDAVEx.{HTTP, Types.DiscoveryInfo, Error}
+  alias CalDAVEx.{Error, HTTP, Types.DiscoveryInfo}
 
   def discover(client) do
     with {:ok, principal} <- find_principal(client),
