@@ -100,6 +100,8 @@ jobs:
         run: mix credo --strict
 
       - name: Build documentation
+        env:
+          MIX_ENV: dev
         run: mix docs
 
       - name: Upload docs artifact
