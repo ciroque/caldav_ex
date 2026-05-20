@@ -2,6 +2,10 @@
 
 This directory contains GitHub Actions workflows for CalDAVEx.
 
+## Acknowledgments
+
+This project was inspired by the [caldav_cleam](https://github.com/RedHelium/caldav_gleam) project, and modeled after the [python-caldav](https://github.com/python-caldav/caldav) library.
+
 ## Workflows
 
 ### CI (`ci.yml`)
