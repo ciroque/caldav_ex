@@ -1,4 +1,8 @@
 defmodule CalDAVEx.Discovery do
+  @moduledoc """
+  CalDAV server discovery for principal and calendar home set URLs.
+  """
+
   alias CalDAVEx.{HTTP, Types.DiscoveryInfo, Error}
 
   def discover(client) do
@@ -89,12 +93,11 @@ defmodule CalDAVEx.Discovery do
 
   defp text({_, _, children}) do
     children
-    |> Enum.map(fn
+    |> Enum.map_join("", fn
       value when is_binary(value) -> value
       {:cdata, value} -> value
       _ -> ""
     end)
-    |> Enum.join("")
     |> String.trim()
     |> empty_to_nil()
   end

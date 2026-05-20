@@ -1,4 +1,8 @@
 defmodule CalDAVEx.Calendar do
+  @moduledoc """
+  Calendar discovery and listing operations.
+  """
+
   alias CalDAVEx.{HTTP, Types.Calendar, XML}
 
   def list(client, discovery_info) do
@@ -21,8 +25,7 @@ defmodule CalDAVEx.Calendar do
         with {:ok, responses} <- XML.parse_multistatus(body, client.config.base_url) do
           calendars =
             responses
-            |> Enum.filter(& &1.href)
-            |> Enum.filter(& &1.is_calendar)
+            |> Enum.filter(&(&1.href && &1.is_calendar))
             |> Enum.map(fn response ->
               %Calendar{
                 url: response.href,

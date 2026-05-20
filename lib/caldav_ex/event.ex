@@ -1,4 +1,8 @@
 defmodule CalDAVEx.Event do
+  @moduledoc """
+  Event operations including listing, retrieval, and CRUD.
+  """
+
   alias CalDAVEx.{HTTP, Types.Event, XML}
 
   def list(client, calendar_url, opts \\ []) do
@@ -109,9 +113,6 @@ defmodule CalDAVEx.Event do
       %ICal{events: [event | _]} ->
         extract_event_fields(event)
 
-      {:ok, %ICal{events: [event | _]}} ->
-        extract_event_fields(event)
-
       _ ->
         empty_event_fields()
     end
@@ -147,8 +148,8 @@ defmodule CalDAVEx.Event do
     }
   end
 
-  defp extract_rrule(%{rrule: rrule}) when is_binary(rrule), do: rrule
   defp extract_rrule(%{rrule: %ICal.Recurrence{} = rrule}), do: format_rrule(rrule)
+  defp extract_rrule(%{rrule: rrule}) when is_binary(rrule), do: rrule
   defp extract_rrule(_), do: nil
 
   defp format_rrule(%ICal.Recurrence{} = rrule) do
@@ -169,19 +170,22 @@ defmodule CalDAVEx.Event do
   defp format_until(_), do: ""
 
   defp format_by_day(by_day) do
-    by_day
-    |> Enum.map(fn
+    Enum.map_join(by_day, ",", fn
       {0, day} -> String.upcase(to_string(day)) |> String.slice(0, 2)
       {n, day} -> "#{n}#{String.upcase(to_string(day)) |> String.slice(0, 2)}"
     end)
-    |> Enum.join(",")
   end
 
-  defp extract_status(%{status: status}) when is_atom(status), do: status |> to_string() |> String.upcase()
-  defp extract_status(%{status: status}) when is_binary(status), do: String.upcase(status)
+  defp extract_status(%{status: status}) when is_atom(status) and not is_nil(status) do
+    status |> to_string() |> String.upcase()
+  end
+
   defp extract_status(_), do: nil
 
-  defp extract_organizer(%{organizer: organizer}) when is_binary(organizer), do: organizer
+  defp extract_organizer(%{organizer: organizer}) when is_binary(organizer) and not is_nil(organizer) do
+    organizer
+  end
+
   defp extract_organizer(_), do: nil
 
   defp extract_attendees(%{attendees: attendees}) when is_list(attendees) do

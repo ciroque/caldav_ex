@@ -1,4 +1,8 @@
 defmodule CalDAVEx.XML do
+  @moduledoc """
+  XML parsing for CalDAV multistatus responses.
+  """
+
   alias CalDAVEx.Error
 
   def parse_multistatus(body, base_url) do
@@ -40,11 +44,11 @@ defmodule CalDAVEx.XML do
   defp get_successful_props(response) do
     response
     |> children_named("propstat")
-    |> Enum.filter(&is_successful_propstat?/1)
+    |> Enum.filter(&successful_propstat?/1)
     |> Enum.flat_map(&get_prop_children/1)
   end
 
-  defp is_successful_propstat?(propstat) do
+  defp successful_propstat?(propstat) do
     status = child_text(propstat, "status")
     status && String.contains?(status, "200 OK")
   end
@@ -79,12 +83,11 @@ defmodule CalDAVEx.XML do
 
   defp text({_, _, children}) do
     children
-    |> Enum.map(fn
+    |> Enum.map_join("", fn
       value when is_binary(value) -> value
       {:cdata, value} -> value
       _ -> ""
     end)
-    |> Enum.join("")
     |> String.trim()
     |> empty_to_nil()
   end

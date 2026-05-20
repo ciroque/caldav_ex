@@ -15,7 +15,8 @@ defmodule CaldavEx.MixProject do
       package: package(),
       docs: docs(),
       name: "CalDAVEx",
-      source_url: @source_url
+      source_url: @source_url,
+      dialyzer: dialyzer()
     ]
   end
 
@@ -26,7 +27,9 @@ defmodule CaldavEx.MixProject do
       {:ical, "~> 2.0"},
       {:tz, "~> 0.28.1"},
       {:bypass, "~> 2.1", only: :test},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -51,6 +54,13 @@ defmodule CaldavEx.MixProject do
       extras: ["README.md", "CHANGELOG.md"],
       source_ref: "v#{@version}",
       source_url: @source_url
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+      plt_add_apps: [:mix, :ex_unit]
     ]
   end
 end

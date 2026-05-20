@@ -1,4 +1,8 @@
 defmodule CalDAVEx.Config do
+  @moduledoc """
+  Configuration management for CalDAV clients.
+  """
+
   defstruct [:base_url, :auth, user_agent: "caldav_ex/0.1.0", timeout_ms: 10_000]
 
   def new(base_url, auth) when is_binary(base_url) do

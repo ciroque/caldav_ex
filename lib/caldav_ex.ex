@@ -41,7 +41,7 @@ defmodule CalDAVEx do
   Use `error_to_string/1` to convert errors to human-readable messages.
   """
 
-  alias CalDAVEx.{Config, Client, Discovery, Calendar, Event, Error}
+  alias CalDAVEx.{Calendar, Client, Config, Discovery, Error, Event}
 
   @doc """
   Returns no authentication configuration.

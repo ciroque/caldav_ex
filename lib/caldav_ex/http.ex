@@ -1,4 +1,8 @@
 defmodule CalDAVEx.HTTP do
+  @moduledoc """
+  HTTP request handling for CalDAV operations.
+  """
+
   def request(client, method, url, headers \\ [], body \\ nil) do
     cfg = client.config
 

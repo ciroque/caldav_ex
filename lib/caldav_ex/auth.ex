@@ -1,4 +1,8 @@
 defmodule CalDAVEx.Auth do
+  @moduledoc """
+  Authentication header generation for CalDAV requests.
+  """
+
   def to_headers(:no_auth), do: []
 
   def to_headers({:basic, username, password}) do
