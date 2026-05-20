@@ -15,14 +15,40 @@ defmodule CalDAVEx.XML do
   end
 
   defp parse_response(response, base_url) do
+    successful_props = get_successful_props(response)
+
     %{
       href: response |> child_text("href") |> absolute_url(base_url),
-      display_name: response |> descendant_text("displayname"),
-      description: response |> descendant_text("calendar-description"),
-      ctag: response |> descendant_text("getctag"),
-      etag: response |> descendant_text("getetag"),
-      calendar_data: response |> descendant_text("calendar-data")
+      display_name: prop_text(successful_props, "displayname"),
+      description: prop_text(successful_props, "calendar-description"),
+      ctag: prop_text(successful_props, "getctag"),
+      etag: prop_text(successful_props, "getetag"),
+      calendar_data: prop_text(successful_props, "calendar-data")
     }
+  end
+
+  defp get_successful_props(response) do
+    response
+    |> children_named("propstat")
+    |> Enum.filter(&is_successful_propstat?/1)
+    |> Enum.flat_map(&get_prop_children/1)
+  end
+
+  defp is_successful_propstat?(propstat) do
+    status = child_text(propstat, "status")
+    status && String.contains?(status, "200 OK")
+  end
+
+  defp get_prop_children(propstat) do
+    propstat
+    |> children_named("prop")
+    |> Enum.flat_map(fn {_, _, children} -> children end)
+  end
+
+  defp prop_text(props, name) do
+    props
+    |> Enum.find(&element_named?(&1, name))
+    |> text()
   end
 
   defp children_named({_, _, children}, name) do
@@ -37,22 +63,6 @@ defmodule CalDAVEx.XML do
     |> List.first()
     |> text()
   end
-
-  defp descendant_text(element, name) do
-    element
-    |> descendants()
-    |> Enum.find(&element_named?(&1, name))
-    |> text()
-  end
-
-  defp descendants({_, _, children}) do
-    Enum.flat_map(children, fn
-      {_, _, _} = child -> [child | descendants(child)]
-      _ -> []
-    end)
-  end
-
-  defp descendants(_), do: []
 
   defp element_named?({tag, _, _}, name), do: local_name(tag) == name
   defp element_named?(_, _name), do: false
