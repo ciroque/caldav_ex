@@ -42,15 +42,17 @@ defmodule CalDAVEx.Types do
     - `display_name` - Human-readable name of the calendar
     - `description` - Optional description of the calendar
     - `ctag` - Calendar collection tag for sync purposes
+    - `is_calendar` - Whether this resource is a calendar (has C:calendar resourcetype)
     """
     @type t :: %__MODULE__{
             url: String.t(),
             display_name: String.t() | nil,
             description: String.t() | nil,
-            ctag: String.t() | nil
+            ctag: String.t() | nil,
+            is_calendar: boolean()
           }
 
-    defstruct [:url, :display_name, :description, :ctag]
+    defstruct [:url, :display_name, :description, :ctag, :is_calendar]
   end
 
   defmodule Event do

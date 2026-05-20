@@ -23,8 +23,18 @@ defmodule CalDAVEx.XML do
       description: prop_text(successful_props, "calendar-description"),
       ctag: prop_text(successful_props, "getctag"),
       etag: prop_text(successful_props, "getetag"),
-      calendar_data: prop_text(successful_props, "calendar-data")
+      calendar_data: prop_text(successful_props, "calendar-data"),
+      is_calendar: has_calendar_resourcetype?(successful_props)
     }
+  end
+
+  defp has_calendar_resourcetype?(props) do
+    props
+    |> Enum.find(&element_named?(&1, "resourcetype"))
+    |> case do
+      nil -> false
+      resourcetype -> resourcetype |> children_named("calendar") |> Enum.any?()
+    end
   end
 
   defp get_successful_props(response) do

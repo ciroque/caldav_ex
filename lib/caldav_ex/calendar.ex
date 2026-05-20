@@ -9,6 +9,7 @@ defmodule CalDAVEx.Calendar do
         <D:displayname/>
         <C:calendar-description/>
         <CS:getctag/>
+        <D:resourcetype/>
       </D:prop>
     </D:propfind>
     """
@@ -21,12 +22,14 @@ defmodule CalDAVEx.Calendar do
           calendars =
             responses
             |> Enum.filter(& &1.href)
+            |> Enum.filter(& &1.is_calendar)
             |> Enum.map(fn response ->
               %Calendar{
                 url: response.href,
                 display_name: response.display_name,
                 description: response.description,
-                ctag: response.ctag
+                ctag: response.ctag,
+                is_calendar: response.is_calendar
               }
             end)
 
