@@ -22,13 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Improved test coverage from 89.27% to 90.53%
+- Improved test coverage from 89.27% to 90.60%
 - Added comprehensive test cases for TZID parsing to maintain coverage targets, including:
   - Timezone conversion for various timezones
   - DST transition handling (fall-back ambiguous and spring-forward gap times)
   - Error handling for invalid timezones and malformed datetimes
   - Backward compatibility with UTC and DATE formats
   - RFC5545 compliance (multiple parameters, quoted values, case-insensitivity)
+- Performance optimization: precompiled TZID extraction regexes at module compile-time
+  - Eliminates repeated regex compilation overhead when processing multiple events
+  - Zero runtime cost for regex compilation
 
 ## [0.1.0] - 2026-05-19
 

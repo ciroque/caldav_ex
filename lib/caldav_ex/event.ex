@@ -5,6 +5,17 @@ defmodule CalDAVEx.Event do
 
   alias CalDAVEx.{HTTP, Types.Event, XML}
 
+  # Precompiled regexes for TZID parameter extraction (performance optimization)
+  @dtstart_tzid_regex Regex.compile!(
+                        "(?:^|\\r?\\n)DTSTART(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:([\\dT]+)(?:\\r?\\n|$)",
+                        "i"
+                      )
+
+  @dtend_tzid_regex Regex.compile!(
+                      "(?:^|\\r?\\n)DTEND(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:([\\dT]+)(?:\\r?\\n|$)",
+                      "i"
+                    )
+
   def list(client, calendar_url, opts \\ []) do
     xml = calendar_query(opts)
 
@@ -228,21 +239,18 @@ defmodule CalDAVEx.Event do
     |> Enum.reject(&is_nil/1)
   end
 
-  defp parse_datetime_with_tzid(calendar_data, property_name) do
-    # Match a single property line containing a TZID parameter, allowing
-    # additional parameters before or after TZID and treating names as
-    # case-insensitive per RFC5545.
-    # Pattern: PROPERTY(;param=value)*;TZID=timezone(;param=value)*:datetime
-    # Also accept quoted TZID values, e.g. TZID="America/New_York"
-    regex =
-      Regex.compile!(
-        "(?:^|\\r?\\n)" <>
-          Regex.escape(property_name) <>
-          "(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:([\\dT]+)(?:\\r?\\n|$)",
-        "i"
-      )
+  defp parse_datetime_with_tzid(calendar_data, "DTSTART") do
+    case Regex.run(@dtstart_tzid_regex, calendar_data) do
+      [_, tzid, datetime_str] ->
+        parse_datetime_in_timezone(datetime_str, normalize_tzid(tzid))
 
-    case Regex.run(regex, calendar_data) do
+      _ ->
+        nil
+    end
+  end
+
+  defp parse_datetime_with_tzid(calendar_data, "DTEND") do
+    case Regex.run(@dtend_tzid_regex, calendar_data) do
       [_, tzid, datetime_str] ->
         parse_datetime_in_timezone(datetime_str, normalize_tzid(tzid))
 
