@@ -131,9 +131,12 @@ defmodule CalDAVEx.Event do
   end
 
   defp extract_event_fields(event, calendar_data) do
-    # Try to parse TZID-based datetimes from raw ICS data
-    dtstart = parse_datetime_with_tzid(calendar_data, "DTSTART") || event.dtstart
-    dtend = parse_datetime_with_tzid(calendar_data, "DTEND") || event.dtend
+    # Normalize calendar data: unfold lines per RFC5545 (CRLF + space/tab = continuation)
+    normalized_data = unfold_icalendar_lines(calendar_data)
+    
+    # Try to parse TZID-based datetimes from normalized ICS data
+    dtstart = parse_datetime_with_tzid(normalized_data, "DTSTART") || event.dtstart
+    dtend = parse_datetime_with_tzid(normalized_data, "DTEND") || event.dtend
 
     %{
       summary: event.summary,
@@ -147,6 +150,14 @@ defmodule CalDAVEx.Event do
       organizer: extract_organizer(event),
       attendees: extract_attendees(event)
     }
+  end
+
+  defp unfold_icalendar_lines(calendar_data) do
+    # Per RFC5545 section 3.1: Lines are delimited by CRLF.
+    # A line that begins with a space or tab is a continuation of the previous line.
+    # Remove CRLF + space/tab to unfold continuation lines.
+    calendar_data
+    |> String.replace(~r/\r?\n[ \t]/, "")
   end
 
   defp empty_event_fields do

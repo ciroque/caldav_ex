@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Improved test coverage from 89.27% to 90.60%
+- Improved test coverage from 89.27% to 90.67%
 - Added comprehensive test cases for TZID parsing to maintain coverage targets, including:
   - Timezone conversion for various timezones
   - DST transition handling (fall-back ambiguous and spring-forward gap times)
@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stricter datetime validation: regex now enforces exact iCalendar DATE-TIME format (YYYYMMDDTHHmmss)
   - Rejects malformed datetime values early (e.g., extra digits, missing separators)
   - Prevents partial matches on invalid input
+- RFC5545 line unfolding: properly handles continuation lines in iCalendar data
+  - Unfolds lines that begin with space or tab per RFC5545 section 3.1
+  - Ensures TZID extraction works with folded properties and XML-indented content
 
 ## [0.1.0] - 2026-05-19
 

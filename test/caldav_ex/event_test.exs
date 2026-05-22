@@ -1243,4 +1243,61 @@ END:VCALENDAR
     assert event.dtend.hour == 19
     assert event.dtend.minute == 0
   end
+
+  test "handles RFC5545 line folding (continuation lines)" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    # Note: Line folding uses CRLF + space/tab for continuation
+    ics_data = """
+BEGIN:VCALENDAR\r
+VERSION:2.0\r
+BEGIN:VEVENT\r
+UID:folded-123\r
+SUMMARY:Folded Line Event\r
+DTSTART;TZID=\r
+ America/Los_Angeles:20260120T160000\r
+DTEND;TZID=America/Los_Angeles:\r
+\t20260120T170000\r
+END:VEVENT\r
+END:VCALENDAR
+"""
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/folded.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;fold-1&quot;</D:getetag>
+              <C:calendar-data>#{ics_data}</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+    
+    # Should unfold continuation lines and parse correctly
+    # DTSTART line is folded with space continuation
+    # DTEND line is folded with tab continuation
+    assert %DateTime{} = event.dtstart
+    assert event.dtstart == ~U[2026-01-21 00:00:00Z]
+    
+    assert %DateTime{} = event.dtend
+    assert event.dtend == ~U[2026-01-21 01:00:00Z]
+  end
 end
