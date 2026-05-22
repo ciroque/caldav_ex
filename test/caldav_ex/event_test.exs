@@ -992,12 +992,12 @@ defmodule CalDAVEx.EventTest do
     assert event.dtend == nil
   end
 
-  test "handles DST transition ambiguous time" do
+  test "handles DST fall-back ambiguous time" do
     bypass = Bypass.open()
     base_url = "http://localhost:#{bypass.port}"
     calendar_url = base_url <> "/calendars/user/personal/"
 
-    # November 3, 2026 at 1:30 AM is ambiguous during DST fall-back
+    # November 1, 2026 at 1:30 AM is ambiguous during DST fall-back
     Bypass.expect_once(bypass, fn conn ->
       conn
       |> Plug.Conn.put_resp_content_type("application/xml")
@@ -1005,11 +1005,11 @@ defmodule CalDAVEx.EventTest do
       <?xml version="1.0" encoding="UTF-8"?>
       <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
         <D:response>
-          <D:href>/calendars/user/personal/dst-event.ics</D:href>
+          <D:href>/calendars/user/personal/dst-fallback.ics</D:href>
           <D:propstat>
             <D:prop>
-              <D:getetag>&quot;dst-1&quot;</D:getetag>
-              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:dst-event-123&#13;&#10;SUMMARY:DST Transition Event&#13;&#10;DTSTART;TZID=America/New_York:20261101T013000&#13;&#10;DTEND;TZID=America/New_York:20261101T023000&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+              <D:getetag>&quot;dst-fb-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:dst-fallback-123&#13;&#10;SUMMARY:DST Fall-back Event&#13;&#10;DTSTART;TZID=America/New_York:20261101T013000&#13;&#10;DTEND;TZID=America/New_York:20261101T023000&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
             </D:prop>
             <D:status>HTTP/1.1 200 OK</D:status>
           </D:propstat>
@@ -1027,6 +1027,46 @@ defmodule CalDAVEx.EventTest do
     # Should handle DST ambiguous time (chooses first occurrence)
     assert %DateTime{} = event.dtstart
     assert %DateTime{} = event.dtend
+  end
+
+  test "handles DST spring-forward gap time" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    # March 8, 2026 at 2:30 AM doesn't exist (gap) during DST spring-forward
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/dst-gap.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;dst-gap-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:dst-gap-123&#13;&#10;SUMMARY:DST Spring-forward Gap Event&#13;&#10;DTSTART;TZID=America/New_York:20260308T023000&#13;&#10;DTEND;TZID=America/New_York:20260308T033000&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+    # Should handle DST gap time (chooses time after the gap)
+    assert %DateTime{} = event.dtstart
+    assert %DateTime{} = event.dtend
+    # The time should be adjusted to after the gap (3:30 AM EDT)
+    refute is_nil(event.dtstart)
+    refute is_nil(event.dtend)
   end
 
   test "parses event with DATE format (no time)" do

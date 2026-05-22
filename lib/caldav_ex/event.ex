@@ -277,8 +277,12 @@ defmodule CalDAVEx.Event do
         DateTime.shift_zone!(datetime, "Etc/UTC")
 
       {:ambiguous, dt1, _dt2} ->
-        # During DST transitions, choose the first occurrence
+        # During fall-back DST transitions, choose the first occurrence
         DateTime.shift_zone!(dt1, "Etc/UTC")
+
+      {:gap, _dt_before, dt_after} ->
+        # During spring-forward DST transitions, choose the time after the gap
+        DateTime.shift_zone!(dt_after, "Etc/UTC")
 
       _ ->
         nil
