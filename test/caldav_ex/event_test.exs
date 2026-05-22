@@ -904,8 +904,6 @@ defmodule CalDAVEx.EventTest do
     # Verify DTSTART and DTEND are properly parsed and converted to UTC
     assert %DateTime{} = event.dtstart
     assert %DateTime{} = event.dtend
-    refute is_nil(event.dtstart)
-    refute is_nil(event.dtend)
 
     # America/Los_Angeles is UTC-8 (PST) in January
     assert event.dtstart.year == 2026

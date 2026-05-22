@@ -308,8 +308,9 @@ defmodule CalDAVEx.Event do
 
   defp convert_to_utc(naive_dt, tzid) do
     # Use the Tz library to convert from the specified timezone to UTC
+    # Use 3-arity functions with explicit database so library works without consumer config
     with datetime when not is_nil(datetime) <- resolve_timezone(naive_dt, tzid),
-         {:ok, utc_datetime} <- DateTime.shift_zone(datetime, "Etc/UTC") do
+         {:ok, utc_datetime} <- DateTime.shift_zone(datetime, "Etc/UTC", Tz.TimeZoneDatabase) do
       utc_datetime
     else
       _ -> nil
@@ -317,7 +318,9 @@ defmodule CalDAVEx.Event do
   end
 
   defp resolve_timezone(naive_dt, tzid) do
-    case DateTime.from_naive(naive_dt, tzid) do
+    # Use 3-arity from_naive with explicit Tz.TimeZoneDatabase
+    # This ensures the library works for consumers without requiring config
+    case DateTime.from_naive(naive_dt, tzid, Tz.TimeZoneDatabase) do
       {:ok, datetime} ->
         datetime
 

@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fall-back (ambiguous times): chooses first occurrence
   - Spring-forward (gap times): chooses time after the gap
 - Events from Apple Calendar and other iCalendar clients with TZID parameters now parse correctly
+- **CRITICAL:** Fixed timezone database dependency issue - library now works without consumer config
+  - Uses 3-arity `DateTime.from_naive/3` and `DateTime.shift_zone/3` with explicit `Tz.TimeZoneDatabase`
+  - Previously required consumers to configure `:elixir, :time_zone_database` in their app
+  - Library now works out-of-the-box when added as a dependency
 - Fixed RFC5545 compliance: TZID parameter now correctly parsed regardless of position or case
   - Handles multiple parameters in any order (e.g., `DTSTART;VALUE=DATE-TIME;TZID=...`)
   - Case-insensitive property name matching per RFC5545 specification
@@ -22,8 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Improved test coverage from 89.27% to 91.08%
-- Added comprehensive test cases for TZID parsing to maintain coverage targets, including:
+- Improved test coverage with comprehensive test cases for TZID parsing, including:
   - Timezone conversion for various timezones
   - DST transition handling (fall-back ambiguous and spring-forward gap times)
   - Error handling for invalid timezones and malformed datetimes
