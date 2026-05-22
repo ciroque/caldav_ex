@@ -95,9 +95,14 @@ defmodule CalDAVEx.Event do
   end
 
   defp format_caldav_datetime(%DateTime{} = datetime) do
-    datetime
-    |> DateTime.shift_zone!("Etc/UTC")
-    |> Calendar.strftime("%Y%m%dT%H%M%SZ")
+    case DateTime.shift_zone(datetime, "Etc/UTC", Tz.TimeZoneDatabase) do
+      {:ok, utc_datetime} ->
+        Calendar.strftime(utc_datetime, "%Y%m%dT%H%M%SZ")
+
+      {:error, _} ->
+        # Fallback: if shift fails, assume already UTC or use as-is
+        Calendar.strftime(datetime, "%Y%m%dT%H%M%SZ")
+    end
   end
 
   defp build_event(response) do
