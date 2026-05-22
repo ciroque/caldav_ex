@@ -706,4 +706,363 @@ defmodule CalDAVEx.EventTest do
     assert event.summary == nil
     assert event.dtstart == nil
   end
+
+  test "parses event with TZID parameter in DTSTART/DTEND" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/tzid-event.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;tzid-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;PRODID:-//Example//EN&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:tzid-event-123&#13;&#10;SUMMARY:Event with TZID&#13;&#10;DTSTART;TZID=America/Los_Angeles:20260120T160000&#13;&#10;DTEND;TZID=America/Los_Angeles:20260120T170000&#13;&#10;DESCRIPTION:Test event with timezone&#13;&#10;LOCATION:Los Angeles&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+
+    assert event.summary == "Event with TZID"
+    assert event.description == "Test event with timezone"
+    assert event.location == "Los Angeles"
+
+    # America/Los_Angeles is UTC-8 (PST) in January
+    # 2026-01-20T16:00:00 PST = 2026-01-21T00:00:00 UTC
+    assert %DateTime{} = event.dtstart
+    assert event.dtstart.year == 2026
+    assert event.dtstart.month == 1
+    assert event.dtstart.day == 21
+    assert event.dtstart.hour == 0
+    assert event.dtstart.minute == 0
+
+    # 2026-01-20T17:00:00 PST = 2026-01-21T01:00:00 UTC
+    assert %DateTime{} = event.dtend
+    assert event.dtend.year == 2026
+    assert event.dtend.month == 1
+    assert event.dtend.day == 21
+    assert event.dtend.hour == 1
+    assert event.dtend.minute == 0
+  end
+
+  test "parses event with TZID parameter - New York timezone" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/ny-event.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;ny-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:ny-event-123&#13;&#10;SUMMARY:New York Meeting&#13;&#10;DTSTART;TZID=America/New_York:20260315T140000&#13;&#10;DTEND;TZID=America/New_York:20260315T150000&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+
+    assert event.summary == "New York Meeting"
+
+    # America/New_York is UTC-4 (EDT) in March (after DST starts)
+    # 2026-03-15T14:00:00 EDT = 2026-03-15T18:00:00 UTC
+    assert %DateTime{} = event.dtstart
+    assert event.dtstart.year == 2026
+    assert event.dtstart.month == 3
+    assert event.dtstart.day == 15
+    assert event.dtstart.hour == 18
+  end
+
+  test "parses event with TZID and falls back to UTC for non-TZID events" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/utc-event.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;utc-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:utc-event-123&#13;&#10;SUMMARY:UTC Event&#13;&#10;DTSTART:20260120T160000Z&#13;&#10;DTEND:20260120T170000Z&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+
+    assert event.summary == "UTC Event"
+    # Should still parse UTC times correctly (fallback to ical library)
+    assert %DateTime{} = event.dtstart
+    assert event.dtstart == ~U[2026-01-20 16:00:00Z]
+  end
+
+  test "parses real-world Apple Calendar event with TZID" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    # Real example from user's request
+    ics_data = """
+    BEGIN:VCALENDAR\r
+    CALSCALE:GREGORIAN\r
+    PRODID:-//Apple Inc.//iPhone OS 26.2//EN\r
+    VERSION:2.0\r
+    BEGIN:VEVENT\r
+    CREATED:20260120T182805Z\r
+    DESCRIPTION:Blood donation appointment\r
+    DTEND;TZID=America/Los_Angeles:20260120T170000\r
+    DTSTAMP:20260120T182806Z\r
+    DTSTART;TZID=America/Los_Angeles:20260120T160000\r
+    LAST-MODIFIED:20260120T182805Z\r
+    LOCATION:3230 NW Randall Way\r
+    SEQUENCE:0\r
+    SUMMARY:Blood Donation - Silverdale Center\r
+    UID:741BFC3B-FAEC-47B4-AE1D-39910DB96AF0\r
+    TRANSP:OPAQUE\r
+    END:VEVENT\r
+    END:VCALENDAR
+    """
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/blood-donation.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;apple-1&quot;</D:getetag>
+              <C:calendar-data>#{ics_data}</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+
+    assert event.summary == "Blood Donation - Silverdale Center"
+    assert event.location == "3230 NW Randall Way"
+    assert event.uid == "741BFC3B-FAEC-47B4-AE1D-39910DB96AF0"
+
+    # Verify DTSTART and DTEND are properly parsed and converted to UTC
+    assert %DateTime{} = event.dtstart
+    assert %DateTime{} = event.dtend
+    refute is_nil(event.dtstart)
+    refute is_nil(event.dtend)
+
+    # America/Los_Angeles is UTC-8 (PST) in January
+    assert event.dtstart.year == 2026
+    assert event.dtstart.month == 1
+    assert event.dtstart.day == 21
+    assert event.dtstart.hour == 0
+    assert event.dtstart.minute == 0
+
+    assert event.dtend.year == 2026
+    assert event.dtend.month == 1
+    assert event.dtend.day == 21
+    assert event.dtend.hour == 1
+    assert event.dtend.minute == 0
+  end
+
+  test "handles event with invalid TZID gracefully" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/invalid-tz.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;inv-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:invalid-tz-123&#13;&#10;SUMMARY:Invalid Timezone Event&#13;&#10;DTSTART;TZID=Invalid/Timezone:20260120T160000&#13;&#10;DTEND;TZID=Invalid/Timezone:20260120T170000&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+    # Should fall back to nil when timezone is invalid
+    assert event.dtstart == nil
+    assert event.dtend == nil
+  end
+
+  test "handles event with malformed datetime in TZID" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/malformed-dt.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;mal-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:malformed-dt-123&#13;&#10;SUMMARY:Malformed DateTime Event&#13;&#10;DTSTART;TZID=America/Los_Angeles:20261399T999999&#13;&#10;DTEND;TZID=America/Los_Angeles:INVALID&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+    # Should handle malformed datetime gracefully
+    assert event.dtstart == nil
+    assert event.dtend == nil
+  end
+
+  test "handles DST transition ambiguous time" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    # November 3, 2026 at 1:30 AM is ambiguous during DST fall-back
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/dst-event.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;dst-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:dst-event-123&#13;&#10;SUMMARY:DST Transition Event&#13;&#10;DTSTART;TZID=America/New_York:20261101T013000&#13;&#10;DTEND;TZID=America/New_York:20261101T023000&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+    # Should handle DST ambiguous time (chooses first occurrence)
+    assert %DateTime{} = event.dtstart
+    assert %DateTime{} = event.dtend
+  end
+
+  test "parses event with DATE format (no time)" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/all-day.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;date-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:all-day-123&#13;&#10;SUMMARY:All Day Event&#13;&#10;DTSTART;VALUE=DATE:20260120&#13;&#10;DTEND;VALUE=DATE:20260121&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+    # DATE format should be parsed by ical library (fallback)
+    assert event.summary == "All Day Event"
+    assert event.dtstart != nil
+    assert event.dtend != nil
+  end
 end

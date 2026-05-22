@@ -111,18 +111,22 @@ defmodule CalDAVEx.Event do
   defp parse_ics(calendar_data) do
     case parse_calendar(calendar_data) do
       %ICal{events: [event | _]} ->
-        extract_event_fields(event)
+        extract_event_fields(event, calendar_data)
 
       _ ->
         empty_event_fields()
     end
   end
 
-  defp extract_event_fields(event) do
+  defp extract_event_fields(event, calendar_data) do
+    # Try to parse TZID-based datetimes from raw ICS data
+    dtstart = parse_datetime_with_tzid(calendar_data, "DTSTART") || event.dtstart
+    dtend = parse_datetime_with_tzid(calendar_data, "DTEND") || event.dtend
+
     %{
       summary: event.summary,
-      dtstart: event.dtstart,
-      dtend: event.dtend,
+      dtstart: dtstart,
+      dtend: dtend,
       uid: event.uid,
       description: event.description,
       location: event.location,
@@ -222,6 +226,65 @@ defmodule CalDAVEx.Event do
       _ -> nil
     end)
     |> Enum.reject(&is_nil/1)
+  end
+
+  defp parse_datetime_with_tzid(calendar_data, property_name) do
+    # Match property with TZID parameter: PROPERTY;TZID=Timezone:VALUE
+    regex = ~r/#{property_name};TZID=([^:]+):([\dT]+)/
+
+    case Regex.run(regex, calendar_data) do
+      [_, tzid, datetime_str] ->
+        parse_datetime_in_timezone(datetime_str, tzid)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp parse_datetime_in_timezone(datetime_str, tzid) do
+    # Parse datetime format: YYYYMMDDTHHmmss
+    case parse_local_datetime(datetime_str) do
+      {:ok, naive_dt} ->
+        convert_to_utc(naive_dt, tzid)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp parse_local_datetime(datetime_str) do
+    # Format: YYYYMMDDTHHmmss
+    case Regex.run(~r/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, datetime_str) do
+      [_, year, month, day, hour, minute, second] ->
+        NaiveDateTime.new(
+          String.to_integer(year),
+          String.to_integer(month),
+          String.to_integer(day),
+          String.to_integer(hour),
+          String.to_integer(minute),
+          String.to_integer(second)
+        )
+
+      _ ->
+        :error
+    end
+  end
+
+  defp convert_to_utc(naive_dt, tzid) do
+    # Use the Tz library to convert from the specified timezone to UTC
+    case DateTime.from_naive(naive_dt, tzid) do
+      {:ok, datetime} ->
+        DateTime.shift_zone!(datetime, "Etc/UTC")
+
+      {:ambiguous, dt1, _dt2} ->
+        # During DST transitions, choose the first occurrence
+        DateTime.shift_zone!(dt1, "Etc/UTC")
+
+      _ ->
+        nil
+    end
+  rescue
+    _ -> nil
   end
 
   defp parse_calendar(calendar_data) do
