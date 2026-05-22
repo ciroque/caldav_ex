@@ -5,6 +5,18 @@ defmodule CalDAVEx.Event do
 
   alias CalDAVEx.{HTTP, Types.Event, XML}
 
+  # Precompiled regexes for TZID parameter extraction (performance optimization)
+  # Pattern matches exact iCalendar DATE-TIME format: YYYYMMDDTHHmmss
+  @dtstart_tzid_regex Regex.compile!(
+                        "(?:^|\\r?\\n)DTSTART(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:(\\d{8}T\\d{6})(?:\\r?\\n|$)",
+                        "i"
+                      )
+
+  @dtend_tzid_regex Regex.compile!(
+                      "(?:^|\\r?\\n)DTEND(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:(\\d{8}T\\d{6})(?:\\r?\\n|$)",
+                      "i"
+                    )
+
   def list(client, calendar_url, opts \\ []) do
     xml = calendar_query(opts)
 
@@ -83,9 +95,14 @@ defmodule CalDAVEx.Event do
   end
 
   defp format_caldav_datetime(%DateTime{} = datetime) do
-    datetime
-    |> DateTime.shift_zone!("Etc/UTC")
-    |> Calendar.strftime("%Y%m%dT%H%M%SZ")
+    case DateTime.shift_zone(datetime, "Etc/UTC", Tz.TimeZoneDatabase) do
+      {:ok, utc_datetime} ->
+        Calendar.strftime(utc_datetime, "%Y%m%dT%H%M%SZ")
+
+      {:error, _} ->
+        # Fallback: if shift fails, assume already UTC or use as-is
+        Calendar.strftime(datetime, "%Y%m%dT%H%M%SZ")
+    end
   end
 
   defp build_event(response) do
@@ -111,18 +128,25 @@ defmodule CalDAVEx.Event do
   defp parse_ics(calendar_data) do
     case parse_calendar(calendar_data) do
       %ICal{events: [event | _]} ->
-        extract_event_fields(event)
+        extract_event_fields(event, calendar_data)
 
       _ ->
         empty_event_fields()
     end
   end
 
-  defp extract_event_fields(event) do
+  defp extract_event_fields(event, calendar_data) do
+    # Normalize calendar data: unfold lines per RFC5545 (CRLF + space/tab = continuation)
+    normalized_data = unfold_icalendar_lines(calendar_data)
+
+    # Try to parse TZID-based datetimes from normalized ICS data
+    dtstart = parse_datetime_with_tzid(normalized_data, "DTSTART") || event.dtstart
+    dtend = parse_datetime_with_tzid(normalized_data, "DTEND") || event.dtend
+
     %{
       summary: event.summary,
-      dtstart: event.dtstart,
-      dtend: event.dtend,
+      dtstart: dtstart,
+      dtend: dtend,
       uid: event.uid,
       description: event.description,
       location: event.location,
@@ -131,6 +155,14 @@ defmodule CalDAVEx.Event do
       organizer: extract_organizer(event),
       attendees: extract_attendees(event)
     }
+  end
+
+  defp unfold_icalendar_lines(calendar_data) do
+    # Per RFC5545 section 3.1: Lines are delimited by CRLF.
+    # A line that begins with a space or tab is a continuation of the previous line.
+    # Remove CRLF + space/tab to unfold continuation lines.
+    calendar_data
+    |> String.replace(~r/\r?\n[ \t]/, "")
   end
 
   defp empty_event_fields do
@@ -222,6 +254,92 @@ defmodule CalDAVEx.Event do
       _ -> nil
     end)
     |> Enum.reject(&is_nil/1)
+  end
+
+  defp parse_datetime_with_tzid(calendar_data, "DTSTART") do
+    case Regex.run(@dtstart_tzid_regex, calendar_data) do
+      [_, tzid, datetime_str] ->
+        parse_datetime_in_timezone(datetime_str, normalize_tzid(tzid))
+
+      _ ->
+        nil
+    end
+  end
+
+  defp parse_datetime_with_tzid(calendar_data, "DTEND") do
+    case Regex.run(@dtend_tzid_regex, calendar_data) do
+      [_, tzid, datetime_str] ->
+        parse_datetime_in_timezone(datetime_str, normalize_tzid(tzid))
+
+      _ ->
+        nil
+    end
+  end
+
+  defp normalize_tzid("\"" <> tzid) do
+    String.trim_trailing(tzid, "\"")
+  end
+
+  defp normalize_tzid(tzid), do: tzid
+
+  defp parse_datetime_in_timezone(datetime_str, tzid) do
+    # Parse datetime format: YYYYMMDDTHHmmss
+    case parse_local_datetime(datetime_str) do
+      {:ok, naive_dt} ->
+        convert_to_utc(naive_dt, tzid)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp parse_local_datetime(datetime_str) do
+    # Format: YYYYMMDDTHHmmss
+    case Regex.run(~r/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, datetime_str) do
+      [_, year, month, day, hour, minute, second] ->
+        NaiveDateTime.new(
+          String.to_integer(year),
+          String.to_integer(month),
+          String.to_integer(day),
+          String.to_integer(hour),
+          String.to_integer(minute),
+          String.to_integer(second)
+        )
+
+      _ ->
+        :error
+    end
+  end
+
+  defp convert_to_utc(naive_dt, tzid) do
+    # Use the Tz library to convert from the specified timezone to UTC
+    # Use 3-arity functions with explicit database so library works without consumer config
+    with datetime when not is_nil(datetime) <- resolve_timezone(naive_dt, tzid),
+         {:ok, utc_datetime} <- DateTime.shift_zone(datetime, "Etc/UTC", Tz.TimeZoneDatabase) do
+      utc_datetime
+    else
+      _ -> nil
+    end
+  end
+
+  defp resolve_timezone(naive_dt, tzid) do
+    # Use 3-arity from_naive with explicit Tz.TimeZoneDatabase
+    # This ensures the library works for consumers without requiring config
+    case DateTime.from_naive(naive_dt, tzid, Tz.TimeZoneDatabase) do
+      {:ok, datetime} ->
+        datetime
+
+      {:ambiguous, dt1, _dt2} ->
+        # During fall-back DST transitions, choose the first occurrence
+        dt1
+
+      {:gap, _dt_before, dt_after} ->
+        # During spring-forward DST transitions, choose the time after the gap
+        dt_after
+
+      {:error, _reason} ->
+        nil
+    end
   end
 
   defp parse_calendar(calendar_data) do
