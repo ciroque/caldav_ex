@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance optimization: precompiled TZID extraction regexes at module compile-time
   - Eliminates repeated regex compilation overhead when processing multiple events
   - Zero runtime cost for regex compilation
+- Stricter datetime validation: regex now enforces exact iCalendar DATE-TIME format (YYYYMMDDTHHmmss)
+  - Rejects malformed datetime values early (e.g., extra digits, missing separators)
+  - Prevents partial matches on invalid input
 
 ## [0.1.0] - 2026-05-19
 

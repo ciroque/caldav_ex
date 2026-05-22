@@ -6,13 +6,14 @@ defmodule CalDAVEx.Event do
   alias CalDAVEx.{HTTP, Types.Event, XML}
 
   # Precompiled regexes for TZID parameter extraction (performance optimization)
+  # Pattern matches exact iCalendar DATE-TIME format: YYYYMMDDTHHmmss
   @dtstart_tzid_regex Regex.compile!(
-                        "(?:^|\\r?\\n)DTSTART(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:([\\dT]+)(?:\\r?\\n|$)",
+                        "(?:^|\\r?\\n)DTSTART(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:(\\d{8}T\\d{6})(?:\\r?\\n|$)",
                         "i"
                       )
 
   @dtend_tzid_regex Regex.compile!(
-                      "(?:^|\\r?\\n)DTEND(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:([\\dT]+)(?:\\r?\\n|$)",
+                      "(?:^|\\r?\\n)DTEND(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:(\\d{8}T\\d{6})(?:\\r?\\n|$)",
                       "i"
                     )
 
