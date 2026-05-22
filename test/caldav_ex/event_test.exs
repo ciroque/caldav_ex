@@ -1129,4 +1129,58 @@ defmodule CalDAVEx.EventTest do
     assert event.dtstart != nil
     assert event.dtend != nil
   end
+
+  test "parses TZID with multiple parameters in different order (RFC5545 compliance)" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    # Note: heredoc starts at column 0 to avoid leading spaces
+    ics_data = """
+    BEGIN:VCALENDAR\r
+    VERSION:2.0\r
+    BEGIN:VEVENT\r
+    UID:multi-param-123\r
+    SUMMARY:Multiple Parameters Event\r
+    DTSTART;VALUE=DATE-TIME;TZID=America/Los_Angeles:20260120T160000\r
+    DTEND;TZID=America/Los_Angeles;X-CUSTOM=test:20260120T170000\r
+    END:VEVENT\r
+    END:VCALENDAR
+    """
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/multi-param.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;mp-1&quot;</D:getetag>
+              <C:calendar-data>#{ics_data}</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+
+    # Should parse TZID even when VALUE parameter comes first
+    assert %DateTime{} = event.dtstart
+    assert event.dtstart == ~U[2026-01-21 00:00:00Z]
+
+    # Should parse TZID even when custom parameter comes after
+    assert %DateTime{} = event.dtend
+    assert event.dtend == ~U[2026-01-21 01:00:00Z]
+  end
 end

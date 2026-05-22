@@ -15,11 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fall-back (ambiguous times): chooses first occurrence
   - Spring-forward (gap times): chooses time after the gap
 - Events from Apple Calendar and other iCalendar clients with TZID parameters now parse correctly
+- Fixed RFC5545 compliance: TZID parameter now correctly parsed regardless of position or case
+  - Handles multiple parameters in any order (e.g., `DTSTART;VALUE=DATE-TIME;TZID=...`)
+  - Case-insensitive property name matching per RFC5545 specification
 
 ### Changed
 
 - Improved test coverage from 89.27% to 90.46%
-- Added 9 new test cases for TZID parsing edge cases:
+- Added 10 new test cases for TZID parsing edge cases:
   - America/Los_Angeles timezone conversion
   - America/New_York timezone with DST
   - Invalid TZID graceful fallback
@@ -29,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - UTC datetime fallback compatibility
   - Real-world Apple Calendar event parsing
   - DATE format (all-day events) compatibility
+  - RFC5545 compliance: multiple parameters in different order
 
 ## [0.1.0] - 2026-05-19
 
@@ -57,3 +61,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CalDAVEx.no_auth/0` - No authentication
 
 [0.1.0]: https://github.com/swagner/caldav_ex/releases/tag/v0.1.0
+[0.1.4]: https://github.com/swagner/caldav_ex/releases/tag/v0.1.4

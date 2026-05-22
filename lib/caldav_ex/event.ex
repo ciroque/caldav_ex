@@ -229,8 +229,17 @@ defmodule CalDAVEx.Event do
   end
 
   defp parse_datetime_with_tzid(calendar_data, property_name) do
-    # Match property with TZID parameter: PROPERTY;TZID=Timezone:VALUE
-    regex = ~r/#{property_name};TZID=([^:]+):([\dT]+)/
+    # Match a single property line containing a TZID parameter, allowing
+    # additional parameters before or after TZID and treating names as
+    # case-insensitive per RFC5545.
+    # Pattern: PROPERTY(;param=value)*;TZID=timezone(;param=value)*:datetime
+    regex =
+      Regex.compile!(
+        "(?:^|\\r?\\n)" <>
+          Regex.escape(property_name) <>
+          "(?=[;:])(?:;[^:\\r\\n]*)*;TZID=([^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:([\\dT]+)(?:\\r?\\n|$)",
+        "i"
+      )
 
     case Regex.run(regex, calendar_data) do
       [_, tzid, datetime_str] ->
