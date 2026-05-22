@@ -804,7 +804,7 @@ defmodule CalDAVEx.EventTest do
     assert event.dtstart.hour == 18
   end
 
-  test "parses event with TZID and falls back to UTC for non-TZID events" do
+  test "maintains backward compatibility with UTC datetime format" do
     bypass = Bypass.open()
     base_url = "http://localhost:#{bypass.port}"
     calendar_url = base_url <> "/calendars/user/personal/"
@@ -837,7 +837,7 @@ defmodule CalDAVEx.EventTest do
     assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
 
     assert event.summary == "UTC Event"
-    # Should still parse UTC times correctly (fallback to ical library)
+    # Verify UTC times still parse correctly via ical library (no TZID parameter)
     assert %DateTime{} = event.dtstart
     assert event.dtstart == ~U[2026-01-20 16:00:00Z]
   end
@@ -848,6 +848,7 @@ defmodule CalDAVEx.EventTest do
     calendar_url = base_url <> "/calendars/user/personal/"
 
     # Real example from user's request
+    # Note: heredoc starts at column 0 to avoid leading spaces (which denote line folding in iCalendar)
     ics_data = """
     BEGIN:VCALENDAR\r
     CALSCALE:GREGORIAN\r
@@ -1024,9 +1025,22 @@ defmodule CalDAVEx.EventTest do
       |> CalDAVEx.new_client()
 
     assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+
     # Should handle DST ambiguous time (chooses first occurrence)
+    # November 1, 2026 at 1:30 AM occurs twice (EDT then EST)
+    # First occurrence: 1:30 AM EDT = 05:30 UTC
     assert %DateTime{} = event.dtstart
+    assert event.dtstart.year == 2026
+    assert event.dtstart.month == 11
+    assert event.dtstart.day == 1
+    assert event.dtstart.hour == 5
+    assert event.dtstart.minute == 30
+    assert event.dtstart.time_zone == "Etc/UTC"
+
+    # 2:30 AM is after the ambiguous period, so it's in EST = 07:30 UTC
     assert %DateTime{} = event.dtend
+    assert event.dtend.hour == 7
+    assert event.dtend.minute == 30
   end
 
   test "handles DST spring-forward gap time" do
@@ -1061,12 +1075,22 @@ defmodule CalDAVEx.EventTest do
       |> CalDAVEx.new_client()
 
     assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+
     # Should handle DST gap time (chooses time after the gap)
+    # March 8, 2026 at 2:30 AM doesn't exist (clocks spring forward from 2:00 AM EST to 3:00 AM EDT)
+    # Gap resolves 2:30 AM → 3:00 AM EDT = 07:00 UTC
     assert %DateTime{} = event.dtstart
+    assert event.dtstart.year == 2026
+    assert event.dtstart.month == 3
+    assert event.dtstart.day == 8
+    assert event.dtstart.hour == 7
+    assert event.dtstart.minute == 0
+    assert event.dtstart.time_zone == "Etc/UTC"
+
+    # 3:30 AM EDT (exists, after the gap) = 07:30 UTC
     assert %DateTime{} = event.dtend
-    # The time should be adjusted to after the gap (3:30 AM EDT)
-    refute is_nil(event.dtstart)
-    refute is_nil(event.dtend)
+    assert event.dtend.hour == 7
+    assert event.dtend.minute == 30
   end
 
   test "parses event with DATE format (no time)" do
