@@ -133,7 +133,7 @@ defmodule CalDAVEx.Event do
   defp extract_event_fields(event, calendar_data) do
     # Normalize calendar data: unfold lines per RFC5545 (CRLF + space/tab = continuation)
     normalized_data = unfold_icalendar_lines(calendar_data)
-    
+
     # Try to parse TZID-based datetimes from normalized ICS data
     dtstart = parse_datetime_with_tzid(normalized_data, "DTSTART") || event.dtstart
     dtend = parse_datetime_with_tzid(normalized_data, "DTEND") || event.dtend
@@ -308,23 +308,30 @@ defmodule CalDAVEx.Event do
 
   defp convert_to_utc(naive_dt, tzid) do
     # Use the Tz library to convert from the specified timezone to UTC
+    with datetime when not is_nil(datetime) <- resolve_timezone(naive_dt, tzid),
+         {:ok, utc_datetime} <- DateTime.shift_zone(datetime, "Etc/UTC") do
+      utc_datetime
+    else
+      _ -> nil
+    end
+  end
+
+  defp resolve_timezone(naive_dt, tzid) do
     case DateTime.from_naive(naive_dt, tzid) do
       {:ok, datetime} ->
-        DateTime.shift_zone!(datetime, "Etc/UTC")
+        datetime
 
       {:ambiguous, dt1, _dt2} ->
         # During fall-back DST transitions, choose the first occurrence
-        DateTime.shift_zone!(dt1, "Etc/UTC")
+        dt1
 
       {:gap, _dt_before, dt_after} ->
         # During spring-forward DST transitions, choose the time after the gap
-        DateTime.shift_zone!(dt_after, "Etc/UTC")
+        dt_after
 
-      _ ->
+      {:error, _reason} ->
         nil
     end
-  rescue
-    _ -> nil
   end
 
   defp parse_calendar(calendar_data) do

@@ -850,25 +850,25 @@ defmodule CalDAVEx.EventTest do
     # Real example from user's request
     # Note: heredoc starts at column 0 to avoid leading spaces (which denote line folding in iCalendar)
     ics_data = """
-BEGIN:VCALENDAR\r
-CALSCALE:GREGORIAN\r
-PRODID:-//Apple Inc.//iPhone OS 26.2//EN\r
-VERSION:2.0\r
-BEGIN:VEVENT\r
-CREATED:20260120T182805Z\r
-DESCRIPTION:Blood donation appointment\r
-DTEND;TZID=America/Los_Angeles:20260120T170000\r
-DTSTAMP:20260120T182806Z\r
-DTSTART;TZID=America/Los_Angeles:20260120T160000\r
-LAST-MODIFIED:20260120T182805Z\r
-LOCATION:3230 NW Randall Way\r
-SEQUENCE:0\r
-SUMMARY:Blood Donation - Silverdale Center\r
-UID:741BFC3B-FAEC-47B4-AE1D-39910DB96AF0\r
-TRANSP:OPAQUE\r
-END:VEVENT\r
-END:VCALENDAR
-"""
+    BEGIN:VCALENDAR\r
+    CALSCALE:GREGORIAN\r
+    PRODID:-//Apple Inc.//iPhone OS 26.2//EN\r
+    VERSION:2.0\r
+    BEGIN:VEVENT\r
+    CREATED:20260120T182805Z\r
+    DESCRIPTION:Blood donation appointment\r
+    DTEND;TZID=America/Los_Angeles:20260120T170000\r
+    DTSTAMP:20260120T182806Z\r
+    DTSTART;TZID=America/Los_Angeles:20260120T160000\r
+    LAST-MODIFIED:20260120T182805Z\r
+    LOCATION:3230 NW Randall Way\r
+    SEQUENCE:0\r
+    SUMMARY:Blood Donation - Silverdale Center\r
+    UID:741BFC3B-FAEC-47B4-AE1D-39910DB96AF0\r
+    TRANSP:OPAQUE\r
+    END:VEVENT\r
+    END:VCALENDAR
+    """
 
     Bypass.expect_once(bypass, fn conn ->
       conn
@@ -1137,16 +1137,16 @@ END:VCALENDAR
 
     # Note: heredoc starts at column 0 to avoid leading spaces
     ics_data = """
-BEGIN:VCALENDAR\r
-VERSION:2.0\r
-BEGIN:VEVENT\r
-UID:multi-param-123\r
-SUMMARY:Multiple Parameters Event\r
-DTSTART;VALUE=DATE-TIME;TZID=America/Los_Angeles:20260120T160000\r
-DTEND;TZID=America/Los_Angeles;X-CUSTOM=test:20260120T170000\r
-END:VEVENT\r
-END:VCALENDAR
-"""
+    BEGIN:VCALENDAR\r
+    VERSION:2.0\r
+    BEGIN:VEVENT\r
+    UID:multi-param-123\r
+    SUMMARY:Multiple Parameters Event\r
+    DTSTART;VALUE=DATE-TIME;TZID=America/Los_Angeles:20260120T160000\r
+    DTEND;TZID=America/Los_Angeles;X-CUSTOM=test:20260120T170000\r
+    END:VEVENT\r
+    END:VCALENDAR
+    """
 
     Bypass.expect_once(bypass, fn conn ->
       conn
@@ -1191,16 +1191,16 @@ END:VCALENDAR
 
     # Note: heredoc starts at column 0 to avoid leading spaces
     ics_data = """
-BEGIN:VCALENDAR\r
-VERSION:2.0\r
-BEGIN:VEVENT\r
-UID:quoted-tzid-123\r
-SUMMARY:Quoted TZID Event\r
-DTSTART;TZID="America/New_York":20260315T140000\r
-DTEND;TZID="America/New_York":20260315T150000\r
-END:VEVENT\r
-END:VCALENDAR
-"""
+    BEGIN:VCALENDAR\r
+    VERSION:2.0\r
+    BEGIN:VEVENT\r
+    UID:quoted-tzid-123\r
+    SUMMARY:Quoted TZID Event\r
+    DTSTART;TZID="America/New_York":20260315T140000\r
+    DTEND;TZID="America/New_York":20260315T150000\r
+    END:VEVENT\r
+    END:VCALENDAR
+    """
 
     Bypass.expect_once(bypass, fn conn ->
       conn
@@ -1251,18 +1251,18 @@ END:VCALENDAR
 
     # Note: Line folding uses CRLF + space/tab for continuation
     ics_data = """
-BEGIN:VCALENDAR\r
-VERSION:2.0\r
-BEGIN:VEVENT\r
-UID:folded-123\r
-SUMMARY:Folded Line Event\r
-DTSTART;TZID=\r
- America/Los_Angeles:20260120T160000\r
-DTEND;TZID=America/Los_Angeles:\r
-\t20260120T170000\r
-END:VEVENT\r
-END:VCALENDAR
-"""
+    BEGIN:VCALENDAR\r
+    VERSION:2.0\r
+    BEGIN:VEVENT\r
+    UID:folded-123\r
+    SUMMARY:Folded Line Event\r
+    DTSTART;TZID=\r
+     America/Los_Angeles:20260120T160000\r
+    DTEND;TZID=America/Los_Angeles:\r
+    \t20260120T170000\r
+    END:VEVENT\r
+    END:VCALENDAR
+    """
 
     Bypass.expect_once(bypass, fn conn ->
       conn
@@ -1290,13 +1290,13 @@ END:VCALENDAR
       |> CalDAVEx.new_client()
 
     assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
-    
+
     # Should unfold continuation lines and parse correctly
     # DTSTART line is folded with space continuation
     # DTEND line is folded with tab continuation
     assert %DateTime{} = event.dtstart
     assert event.dtstart == ~U[2026-01-21 00:00:00Z]
-    
+
     assert %DateTime{} = event.dtend
     assert event.dtend == ~U[2026-01-21 01:00:00Z]
   end

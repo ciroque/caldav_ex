@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Improved test coverage from 89.27% to 90.67%
+- Improved test coverage from 89.27% to 91.08%
 - Added comprehensive test cases for TZID parsing to maintain coverage targets, including:
   - Timezone conversion for various timezones
   - DST transition handling (fall-back ambiguous and spring-forward gap times)
@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RFC5545 line unfolding: properly handles continuation lines in iCalendar data
   - Unfolds lines that begin with space or tab per RFC5545 section 3.1
   - Ensures TZID extraction works with folded properties and XML-indented content
+- Improved error handling: replaced bang functions with explicit error handling
+  - Uses `DateTime.shift_zone/3` instead of `shift_zone!/2` with blanket rescue
+  - Explicit handling of `{:ok, dt}` and `{:error, reason}` for better debugging
+  - Separated timezone resolution logic for clarity
 
 ## [0.1.0] - 2026-05-19
 
