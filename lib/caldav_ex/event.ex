@@ -233,22 +233,29 @@ defmodule CalDAVEx.Event do
     # additional parameters before or after TZID and treating names as
     # case-insensitive per RFC5545.
     # Pattern: PROPERTY(;param=value)*;TZID=timezone(;param=value)*:datetime
+    # Also accept quoted TZID values, e.g. TZID="America/New_York"
     regex =
       Regex.compile!(
         "(?:^|\\r?\\n)" <>
           Regex.escape(property_name) <>
-          "(?=[;:])(?:;[^:\\r\\n]*)*;TZID=([^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:([\\dT]+)(?:\\r?\\n|$)",
+          "(?=[;:])(?:;[^:\\r\\n]*)*;TZID=(\"[^\"]+\"|[^;:\\r\\n]+)(?:;[^:\\r\\n]*)*:([\\dT]+)(?:\\r?\\n|$)",
         "i"
       )
 
     case Regex.run(regex, calendar_data) do
       [_, tzid, datetime_str] ->
-        parse_datetime_in_timezone(datetime_str, tzid)
+        parse_datetime_in_timezone(datetime_str, normalize_tzid(tzid))
 
       _ ->
         nil
     end
   end
+
+  defp normalize_tzid("\"" <> tzid) do
+    String.trim_trailing(tzid, "\"")
+  end
+
+  defp normalize_tzid(tzid), do: tzid
 
   defp parse_datetime_in_timezone(datetime_str, tzid) do
     # Parse datetime format: YYYYMMDDTHHmmss

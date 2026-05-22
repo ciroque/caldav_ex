@@ -18,21 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed RFC5545 compliance: TZID parameter now correctly parsed regardless of position or case
   - Handles multiple parameters in any order (e.g., `DTSTART;VALUE=DATE-TIME;TZID=...`)
   - Case-insensitive property name matching per RFC5545 specification
+  - Supports quoted TZID parameter values (e.g., `TZID="America/New_York"`)
 
 ### Changed
 
-- Improved test coverage from 89.27% to 90.46%
-- Added 10 new test cases for TZID parsing edge cases:
-  - America/Los_Angeles timezone conversion
-  - America/New_York timezone with DST
-  - Invalid TZID graceful fallback
-  - Malformed datetime handling
-  - DST fall-back ambiguous time handling
-  - DST spring-forward gap time handling
-  - UTC datetime fallback compatibility
-  - Real-world Apple Calendar event parsing
-  - DATE format (all-day events) compatibility
-  - RFC5545 compliance: multiple parameters in different order
+- Improved test coverage from 89.27% to 90.53%
+- Added comprehensive test cases for TZID parsing to maintain coverage targets, including:
+  - Timezone conversion for various timezones
+  - DST transition handling (fall-back ambiguous and spring-forward gap times)
+  - Error handling for invalid timezones and malformed datetimes
+  - Backward compatibility with UTC and DATE formats
+  - RFC5545 compliance (multiple parameters, quoted values, case-insensitivity)
 
 ## [0.1.0] - 2026-05-19
 
@@ -60,5 +56,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CalDAVEx.basic_auth/2` - Basic authentication
 - `CalDAVEx.no_auth/0` - No authentication
 
-[0.1.0]: https://github.com/swagner/caldav_ex/releases/tag/v0.1.0
-[0.1.4]: https://github.com/swagner/caldav_ex/releases/tag/v0.1.4
+[0.1.0]: https://github.com/ciroque/caldav_ex/releases/tag/v0.1.0
+[0.1.4]: https://github.com/ciroque/caldav_ex/releases/tag/v0.1.4

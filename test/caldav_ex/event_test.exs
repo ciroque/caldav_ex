@@ -1183,4 +1183,64 @@ defmodule CalDAVEx.EventTest do
     assert %DateTime{} = event.dtend
     assert event.dtend == ~U[2026-01-21 01:00:00Z]
   end
+
+  test "parses quoted TZID parameter values (RFC5545 compliance)" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    # Note: heredoc starts at column 0 to avoid leading spaces
+    ics_data = """
+    BEGIN:VCALENDAR\r
+    VERSION:2.0\r
+    BEGIN:VEVENT\r
+    UID:quoted-tzid-123\r
+    SUMMARY:Quoted TZID Event\r
+    DTSTART;TZID="America/New_York":20260315T140000\r
+    DTEND;TZID="America/New_York":20260315T150000\r
+    END:VEVENT\r
+    END:VCALENDAR
+    """
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/quoted-tzid.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;qt-1&quot;</D:getetag>
+              <C:calendar-data>#{ics_data}</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [event]} = CalDAVEx.Event.list(client, calendar_url)
+
+    # Should parse quoted TZID values correctly
+    # March 15, 2026 at 2:00 PM EDT = 18:00 UTC
+    assert %DateTime{} = event.dtstart
+    assert event.dtstart.year == 2026
+    assert event.dtstart.month == 3
+    assert event.dtstart.day == 15
+    assert event.dtstart.hour == 18
+    assert event.dtstart.minute == 0
+
+    # March 15, 2026 at 3:00 PM EDT = 19:00 UTC
+    assert %DateTime{} = event.dtend
+    assert event.dtend.hour == 19
+    assert event.dtend.minute == 0
+  end
 end
