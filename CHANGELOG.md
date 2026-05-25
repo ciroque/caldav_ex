@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-05-25
+
+### Added
+
+- Comprehensive `@moduledoc` and `@doc` documentation across the entire
+  public API following idiomatic ExDoc conventions
+  (`## Parameters`, `## Returns`, `## Examples`).
+- `groups_for_modules` configuration in `mix.exs` to organize the
+  HexDocs sidebar (Public API, Client, Operations, Internals, Types,
+  Errors).
+
+### Fixed
+
+- Default `User-Agent` header in `CalDAVEx.Config` is now derived from
+  the application version via `:application.get_key(:caldav_ex, :vsn)`
+  at runtime instead of a hard-coded `"caldav_ex/0.1.0"` string, so it
+  tracks the released version. Consumers who set a custom User-Agent
+  via `CalDAVEx.with_user_agent/2` are unaffected.
+
 ## [0.2.0] - 2026-05-25
 
 ### Added
@@ -120,3 +139,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.1.0]: https://github.com/ciroque/caldav_ex/releases/tag/v0.1.0
 [0.1.4]: https://github.com/ciroque/caldav_ex/releases/tag/v0.1.4
 [0.2.0]: https://github.com/ciroque/caldav_ex/releases/tag/v0.2.0
+[0.2.1]: https://github.com/ciroque/caldav_ex/releases/tag/v0.2.1

@@ -1,10 +1,34 @@
 defmodule CalDAVEx.Calendar do
   @moduledoc """
-  Calendar discovery and listing operations.
+  Calendar listing operations against a CalDAV server.
   """
 
   alias CalDAVEx.{HTTP, Types.Calendar, XML}
 
+  @doc """
+  Lists all calendars under the user's calendar-home-set.
+
+  Issues a `PROPFIND` with `Depth: 1` requesting `displayname`,
+  `calendar-description`, `getctag`, and `resourcetype` for each child
+  resource, then filters the multistatus response to entries whose
+  `resourcetype` includes `CALDAV:calendar`.
+
+  ## Parameters
+
+    - `client` - an authenticated `%CalDAVEx.Client{}`
+    - `discovery_info` - a `t:CalDAVEx.Types.DiscoveryInfo.t/0` from
+      `CalDAVEx.Discovery.discover/1`
+
+  ## Returns
+
+    - `{:ok, [%CalDAVEx.Types.Calendar{}]}` on success
+    - `{:error, %CalDAVEx.Error{}}` on transport, HTTP, or XML failures
+
+  ## Examples
+
+      {:ok, info} = CalDAVEx.discover(client)
+      {:ok, calendars} = CalDAVEx.Calendar.list(client, info)
+  """
   def list(client, discovery_info) do
     xml = """
     <?xml version="1.0" encoding="UTF-8"?>

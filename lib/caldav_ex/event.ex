@@ -1,6 +1,15 @@
 defmodule CalDAVEx.Event do
   @moduledoc """
-  Event operations including listing, retrieval, and CRUD.
+  Event operations: listing, retrieval, and CRUD against a CalDAV calendar.
+
+  Listing uses the `REPORT` method with a `calendar-query` filter. Server-side
+  recurrence expansion via `<C:expand>` is supported through the
+  `:expand_recurrences` option on `list/3`.
+
+  Timed events whose `DTSTART`/`DTEND` carry a `TZID` parameter are normalized
+  to UTC `DateTime` values using `Tz.TimeZoneDatabase`; ambiguous (fall-back)
+  times resolve to the first occurrence and gap (spring-forward) times to the
+  time immediately after the gap.
   """
 
   alias CalDAVEx.{Error, HTTP, Types.Event, XML}
@@ -17,6 +26,40 @@ defmodule CalDAVEx.Event do
                       "i"
                     )
 
+  @doc """
+  Lists events from a calendar, optionally filtered by a time range.
+
+  Returned events are not guaranteed to be unique by `href` or `etag`: a
+  single CalDAV resource whose `calendar-data` contains multiple `VEVENT`
+  components (e.g. a recurring master plus `RECURRENCE-ID` overrides, or
+  occurrences produced by `<C:expand>`) yields one `%CalDAVEx.Types.Event{}`
+  per `VEVENT` sharing the same `href`/`etag`.
+
+  ## Parameters
+
+    - `client` - an authenticated `%CalDAVEx.Client{}`
+    - `calendar_url` - the full URL of the calendar collection
+    - `opts` - keyword list:
+      - `:from` - start of the time range (`t:DateTime.t/0` or `nil`)
+      - `:to` - end of the time range (`t:DateTime.t/0` or `nil`)
+      - `:expand_recurrences` - when `true`, asks the server to expand
+        recurring events via `<C:expand>`. Both `:from` and `:to` MUST be
+        provided when this is `true`; otherwise an
+        `{:error, %CalDAVEx.Error{type: :invalid_argument}}` is returned.
+        Server support varies. Defaults to `false`.
+
+  ## Returns
+
+    - `{:ok, [%CalDAVEx.Types.Event{}]}` on success
+    - `{:error, %CalDAVEx.Error{}}` on validation, transport, HTTP, or XML failures
+
+  ## Examples
+
+      {:ok, events} = CalDAVEx.Event.list(client, calendar.url,
+        from: ~U[2025-05-01 00:00:00Z],
+        to: ~U[2025-05-31 23:59:59Z]
+      )
+  """
   def list(client, calendar_url, opts \\ []) do
     with :ok <- validate_opts(opts),
          xml = calendar_query(opts),
@@ -56,6 +99,24 @@ defmodule CalDAVEx.Event do
   defp valid_bound?(%DateTime{}), do: true
   defp valid_bound?(_), do: false
 
+  @doc """
+  Fetches a single event resource by URL.
+
+  Returns an event populated with the raw `calendar_data` body and the
+  `ETag` header (when present). Parsed iCalendar fields such as `summary` or
+  `dtstart` are **not** populated by this function; use `list/3` for parsed
+  results, or parse `calendar_data` yourself.
+
+  ## Parameters
+
+    - `client` - an authenticated `%CalDAVEx.Client{}`
+    - `event_url` - the full URL of the event resource
+
+  ## Returns
+
+    - `{:ok, %CalDAVEx.Types.Event{}}` on success
+    - `{:error, %CalDAVEx.Error{}}` on failure
+  """
   def get(client, event_url) do
     case HTTP.request(client, :get, event_url) do
       {:ok, %{body: body, headers: headers}} ->
@@ -67,6 +128,24 @@ defmodule CalDAVEx.Event do
     end
   end
 
+  @doc """
+  Creates a new event resource by `PUT`ing iCalendar data to the calendar.
+
+  The request includes `If-None-Match: *` to ensure the operation only
+  succeeds when no resource exists at the target URL.
+
+  ## Parameters
+
+    - `client` - an authenticated `%CalDAVEx.Client{}`
+    - `calendar_url` - the URL of the parent calendar collection
+    - `filename` - the resource filename (e.g. `"event.ics"`)
+    - `ics_data` - the iCalendar (`VCALENDAR`/`VEVENT`) body as a string
+
+  ## Returns
+
+    - `{:ok, %CalDAVEx.Types.Event{href: url}}` on success
+    - `{:error, %CalDAVEx.Error{}}` on failure
+  """
   def create(client, calendar_url, filename, ics_data) do
     url = String.trim_trailing(calendar_url, "/") <> "/" <> filename
     headers = [{"if-none-match", "*"}]
@@ -77,11 +156,47 @@ defmodule CalDAVEx.Event do
     end
   end
 
+  @doc """
+  Replaces an existing event resource with new iCalendar data.
+
+  When `etag` is provided, the request includes `If-Match: <etag>` to perform
+  an optimistic-concurrency update; a stale ETag results in a `412` HTTP
+  error wrapped in `CalDAVEx.Error`.
+
+  ## Parameters
+
+    - `client` - an authenticated `%CalDAVEx.Client{}`
+    - `event_url` - the full URL of the event resource
+    - `ics_data` - the replacement iCalendar body
+    - `etag` - the previously observed ETag, or `nil` to skip the conditional header
+
+  ## Returns
+
+    - `{:ok, %{status: integer, body: term, headers: list}}` on success
+    - `{:error, %CalDAVEx.Error{}}` on HTTP, transport, or ETag-mismatch (`412`) failures
+  """
   def update(client, event_url, ics_data, etag) do
     headers = if etag, do: [{"if-match", etag}], else: []
     HTTP.request(client, :put, event_url, headers, ics_data)
   end
 
+  @doc """
+  Deletes an event resource.
+
+  When `etag` is provided, the request includes `If-Match: <etag>` for
+  optimistic concurrency.
+
+  ## Parameters
+
+    - `client` - an authenticated `%CalDAVEx.Client{}`
+    - `event_url` - the full URL of the event resource
+    - `etag` - the previously observed ETag, or `nil` to skip the conditional header
+
+  ## Returns
+
+    - `{:ok, %{status: integer, body: term, headers: list}}` on success
+    - `{:error, %CalDAVEx.Error{}}` on HTTP, transport, or ETag-mismatch (`412`) failures
+  """
   def delete(client, event_url, etag) do
     headers = if etag, do: [{"if-match", etag}], else: []
     HTTP.request(client, :delete, event_url, headers)

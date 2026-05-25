@@ -1,8 +1,33 @@
 defmodule CalDAVEx.HTTP do
   @moduledoc """
-  HTTP request handling for CalDAV operations.
+  Low-level HTTP transport for CalDAV requests.
+
+  Wraps `Req` to issue `GET`, `PUT`, `DELETE`, and the WebDAV/CalDAV
+  extension methods (`PROPFIND`, `PROPPATCH`, `MKCALENDAR`, `REPORT`),
+  injects standard headers (`User-Agent`, `Content-Type`, `Accept`) and
+  the `Authorization` header produced by `CalDAVEx.Auth`, applies the
+  client's configured `timeout_ms`, and normalizes results into either
+  `{:ok, %{status, body, headers}}` or `{:error, %CalDAVEx.Error{}}`.
   """
 
+  @doc """
+  Issues a single HTTP request against a CalDAV server.
+
+  ## Parameters
+
+    - `client` - a `%CalDAVEx.Client{}`
+    - `method` - one of `:get`, `:put`, `:delete`, `:propfind`,
+      `:proppatch`, `:mkcalendar`, `:report`, or any value accepted by `Req`
+    - `url` - the absolute request URL
+    - `headers` - additional request headers as `{name, value}` tuples
+    - `body` - request body, or `nil` for methods that have no body
+
+  ## Returns
+
+    - `{:ok, %{status: integer, body: term, headers: list}}` for 2xx responses
+    - `{:error, %CalDAVEx.Error{type: :http}}` for non-2xx responses
+    - `{:error, %CalDAVEx.Error{type: :transport}}` for connection/transport failures
+  """
   def request(client, method, url, headers \\ [], body \\ nil) do
     cfg = client.config
 
@@ -30,7 +55,7 @@ defmodule CalDAVEx.HTTP do
     auth_headers = CalDAVEx.Auth.to_headers(cfg.auth)
 
     [
-      {"user-agent", cfg.user_agent},
+      {"user-agent", cfg.user_agent || CalDAVEx.Config.default_user_agent()},
       {"content-type", "application/xml; charset=utf-8"},
       {"accept", "application/xml"}
       | auth_headers ++ extra
