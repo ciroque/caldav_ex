@@ -63,6 +63,399 @@ defmodule CalDAVEx.EventTest do
     assert calendar_data =~ "BEGIN:VCALENDAR"
   end
 
+  test "includes C:expand element when expand_recurrences: true with from and to" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      assert body =~ "<C:expand start=\"20250501T000000Z\" end=\"20250531T235959Z\"/>"
+      assert body =~ "<C:calendar-data>"
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, []} =
+             CalDAVEx.Event.list(client, calendar_url,
+               from: ~U[2025-05-01 00:00:00Z],
+               to: ~U[2025-05-31 23:59:59Z],
+               expand_recurrences: true
+             )
+  end
+
+  test "does not include C:expand element when expand_recurrences: false" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      refute body =~ "<C:expand"
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, []} =
+             CalDAVEx.Event.list(client, calendar_url,
+               from: ~U[2025-05-01 00:00:00Z],
+               to: ~U[2025-05-31 23:59:59Z]
+             )
+  end
+
+  test "returns error when expand_recurrences: true without from and to" do
+    base_url = "http://localhost:1"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:error, %CalDAVEx.Error{} = err} =
+             CalDAVEx.Event.list(client, calendar_url, expand_recurrences: true)
+
+    assert err.type == :invalid_argument
+
+    assert {:error, %CalDAVEx.Error{}} =
+             CalDAVEx.Event.list(client, calendar_url,
+               from: ~U[2025-05-01 00:00:00Z],
+               expand_recurrences: true
+             )
+
+    assert {:error, %CalDAVEx.Error{}} =
+             CalDAVEx.Event.list(client, calendar_url,
+               to: ~U[2025-05-31 23:59:59Z],
+               expand_recurrences: true
+             )
+  end
+
+  test "returns :invalid_argument when :from or :to is non-DateTime regardless of expand_recurrences" do
+    base_url = "http://localhost:1"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    # Non-DateTime :from with expand_recurrences omitted (defaults to false)
+    # would previously crash with FunctionClauseError inside format_caldav_datetime/1.
+    assert {:error, %CalDAVEx.Error{type: :invalid_argument}} =
+             CalDAVEx.Event.list(client, calendar_url, from: ~N[2025-05-01 00:00:00])
+
+    assert {:error, %CalDAVEx.Error{type: :invalid_argument}} =
+             CalDAVEx.Event.list(client, calendar_url, to: "2025-05-31")
+
+    assert {:error, %CalDAVEx.Error{type: :invalid_argument}} =
+             CalDAVEx.Event.list(client, calendar_url,
+               from: ~U[2025-05-01 00:00:00Z],
+               to: ~D[2025-05-31]
+             )
+
+    # nil bounds remain valid (means "no time-range filter").
+    # We can't easily assert :ok here without a Bypass server, but the existing
+    # "returns events from a calendar" test covers that path with no opts.
+  end
+
+  test "returns :invalid_argument when expand_recurrences: true with non-DateTime bounds" do
+    base_url = "http://localhost:1"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    # NaiveDateTime is rejected
+    assert {:error, %CalDAVEx.Error{type: :invalid_argument}} =
+             CalDAVEx.Event.list(client, calendar_url,
+               from: ~N[2025-05-01 00:00:00],
+               to: ~U[2025-05-31 23:59:59Z],
+               expand_recurrences: true
+             )
+
+    # String is rejected
+    assert {:error, %CalDAVEx.Error{type: :invalid_argument}} =
+             CalDAVEx.Event.list(client, calendar_url,
+               from: ~U[2025-05-01 00:00:00Z],
+               to: "2025-05-31",
+               expand_recurrences: true
+             )
+  end
+
+  test "split is robust to property values containing literal BEGIN:VEVENT/END:VEVENT" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    # Two VEVENTs so parse_ics/1 actually exercises split_vevent_blocks/1
+    # (the single-VEVENT fast path skips it). The first VEVENT's SUMMARY and
+    # DESCRIPTION values contain the literal substrings "BEGIN:VEVENT" and
+    # "END:VEVENT" — legal per RFC 5545 (colons need not be escaped in TEXT).
+    # A naive regex split would either truncate block 1 before its DTSTART or
+    # mis-align block boundaries, corrupting both events.
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/tricky.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;tricky-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:tricky-1&#13;&#10;SUMMARY:Discusses BEGIN:VEVENT and END:VEVENT markers&#13;&#10;DESCRIPTION:Notes about END:VEVENT handling in parsers&#13;&#10;DTSTART;TZID=America/Los_Angeles:20260120T080000&#13;&#10;DTEND;TZID=America/Los_Angeles:20260120T090000&#13;&#10;END:VEVENT&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:tricky-2&#13;&#10;SUMMARY:Plain follow-up&#13;&#10;DTSTART;TZID=America/Los_Angeles:20260121T100000&#13;&#10;DTEND;TZID=America/Los_Angeles:20260121T110000&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [tricky, plain]} = CalDAVEx.Event.list(client, calendar_url)
+
+    assert tricky.summary == "Discusses BEGIN:VEVENT and END:VEVENT markers"
+    # 08:00 PST -> 16:00 UTC. If block 1 was truncated by the literal
+    # END:VEVENT in DESCRIPTION, its TZID DTSTART line would fall outside
+    # the block and parse_datetime_with_tzid would return nil.
+    assert %DateTime{hour: 16, day: 20, month: 1, year: 2026} = tricky.dtstart
+    assert %DateTime{hour: 17, day: 20, month: 1, year: 2026} = tricky.dtend
+
+    assert plain.summary == "Plain follow-up"
+    # 10:00 PST -> 18:00 UTC on the next day. Wrong block alignment would
+    # leak the first event's TZID DTSTART into this one.
+    assert %DateTime{hour: 18, day: 21, month: 1, year: 2026} = plain.dtstart
+    assert %DateTime{hour: 19, day: 21, month: 1, year: 2026} = plain.dtend
+  end
+
+  test "split is robust to property values ending a line with literal END:VEVENT" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    # Two VEVENTs to exercise split_vevent_blocks/1 (single-VEVENT fast path
+    # skips it). The first VEVENT's DESCRIPTION ENDS with the literal
+    # "END:VEVENT" followed by CRLF — a regex requiring END:VEVENT only at
+    # end-of-line (without also anchoring it to start-of-line) would terminate
+    # block 1 prematurely, dropping its DTSTART/DTEND and mis-aligning block 2.
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/eol.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;eol-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:eol-1&#13;&#10;SUMMARY:Trailing marker&#13;&#10;DESCRIPTION:Notes ending with END:VEVENT&#13;&#10;DTSTART;TZID=America/Los_Angeles:20260120T080000&#13;&#10;DTEND;TZID=America/Los_Angeles:20260120T090000&#13;&#10;END:VEVENT&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:eol-2&#13;&#10;SUMMARY:Plain follow-up&#13;&#10;DTSTART;TZID=America/Los_Angeles:20260121T100000&#13;&#10;DTEND;TZID=America/Los_Angeles:20260121T110000&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [trailing, plain]} = CalDAVEx.Event.list(client, calendar_url)
+
+    assert trailing.summary == "Trailing marker"
+    assert %DateTime{hour: 16, day: 20, month: 1, year: 2026} = trailing.dtstart
+    assert %DateTime{hour: 17, day: 20, month: 1, year: 2026} = trailing.dtend
+
+    assert plain.summary == "Plain follow-up"
+    assert %DateTime{hour: 18, day: 21, month: 1, year: 2026} = plain.dtstart
+    assert %DateTime{hour: 19, day: 21, month: 1, year: 2026} = plain.dtend
+  end
+
+  test "scopes TZID parsing to its own VEVENT block in multi-event calendar-data" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/multi-tz.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;mt-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#13;&#10;VERSION:2.0&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:first&#13;&#10;SUMMARY:First&#13;&#10;DTSTART;TZID=America/Los_Angeles:20260120T080000&#13;&#10;DTEND;TZID=America/Los_Angeles:20260120T090000&#13;&#10;END:VEVENT&#13;&#10;BEGIN:VEVENT&#13;&#10;UID:second&#13;&#10;SUMMARY:Second&#13;&#10;DTSTART;TZID=America/Los_Angeles:20260120T150000&#13;&#10;DTEND;TZID=America/Los_Angeles:20260120T160000&#13;&#10;END:VEVENT&#13;&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, [first, second]} = CalDAVEx.Event.list(client, calendar_url)
+
+    assert first.summary == "First"
+    assert second.summary == "Second"
+
+    # America/Los_Angeles in January is UTC-8 (PST).
+    # First:  08:00 PST -> 16:00 UTC
+    # Second: 15:00 PST -> 23:00 UTC
+    # If TZID parsing leaked across VEVENT boundaries, both would resolve to 16:00.
+    assert %DateTime{hour: 16} = first.dtstart
+    assert %DateTime{hour: 23} = second.dtstart
+    assert first.dtstart != second.dtstart
+  end
+
+  test "expand_recurrences: true returns one event per occurrence end-to-end" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      # Verify the request asked the server to expand
+      assert body =~ "<C:expand start=\"20250501T000000Z\" end=\"20250531T235959Z\"/>"
+
+      # Server responds with expanded VCALENDAR: three occurrences of the same UID,
+      # the recurring instances carrying RECURRENCE-ID (RFC 4791 §9.6.5).
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/weekly.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;expanded-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#10;VERSION:2.0&#10;BEGIN:VEVENT&#10;UID:weekly-1&#10;SUMMARY:Standup&#10;DTSTART:20250506T140000Z&#10;DTEND:20250506T143000Z&#10;END:VEVENT&#10;BEGIN:VEVENT&#10;UID:weekly-1&#10;RECURRENCE-ID:20250513T140000Z&#10;SUMMARY:Standup&#10;DTSTART:20250513T140000Z&#10;DTEND:20250513T143000Z&#10;END:VEVENT&#10;BEGIN:VEVENT&#10;UID:weekly-1&#10;RECURRENCE-ID:20250520T140000Z&#10;SUMMARY:Standup&#10;DTSTART:20250520T140000Z&#10;DTEND:20250520T143000Z&#10;END:VEVENT&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, events} =
+             CalDAVEx.Event.list(client, calendar_url,
+               from: ~U[2025-05-01 00:00:00Z],
+               to: ~U[2025-05-31 23:59:59Z],
+               expand_recurrences: true
+             )
+
+    # Each expanded VEVENT becomes its own %Event{}
+    assert length(events) == 3
+
+    # All occurrences share the parent resource's href/etag and UID
+    expected_href = base_url <> "/calendars/user/personal/weekly.ics"
+    assert events |> Enum.map(& &1.href) |> Enum.uniq() == [expected_href]
+    assert events |> Enum.map(& &1.etag) |> Enum.uniq() == ["\"expanded-1\""]
+    assert events |> Enum.map(& &1.uid) |> Enum.uniq() == ["weekly-1"]
+
+    # But each has its own dtstart — the whole point of expansion
+    assert events |> Enum.map(& &1.dtstart) |> Enum.sort() == [
+             ~U[2025-05-06 14:00:00Z],
+             ~U[2025-05-13 14:00:00Z],
+             ~U[2025-05-20 14:00:00Z]
+           ]
+  end
+
+  test "splits calendar-data with multiple VEVENTs into one event per occurrence" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    calendar_url = base_url <> "/calendars/user/personal/"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+        <D:response>
+          <D:href>/calendars/user/personal/weekly.ics</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:getetag>&quot;exp-1&quot;</D:getetag>
+              <C:calendar-data>BEGIN:VCALENDAR&#10;VERSION:2.0&#10;BEGIN:VEVENT&#10;UID:weekly-1&#10;SUMMARY:Standup&#10;DTSTART:20250505T140000Z&#10;DTEND:20250505T143000Z&#10;END:VEVENT&#10;BEGIN:VEVENT&#10;UID:weekly-1&#10;RECURRENCE-ID:20250512T140000Z&#10;SUMMARY:Standup&#10;DTSTART:20250512T140000Z&#10;DTEND:20250512T143000Z&#10;END:VEVENT&#10;BEGIN:VEVENT&#10;UID:weekly-1&#10;RECURRENCE-ID:20250519T140000Z&#10;SUMMARY:Standup&#10;DTSTART:20250519T140000Z&#10;DTEND:20250519T143000Z&#10;END:VEVENT&#10;END:VCALENDAR</C:calendar-data>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    assert {:ok, events} = CalDAVEx.Event.list(client, calendar_url)
+    assert length(events) == 3
+
+    expected_href = base_url <> "/calendars/user/personal/weekly.ics"
+    assert events |> Enum.map(& &1.href) |> Enum.uniq() == [expected_href]
+    assert events |> Enum.map(& &1.etag) |> Enum.uniq() == ["\"exp-1\""]
+
+    dtstarts = events |> Enum.map(& &1.dtstart) |> Enum.sort()
+
+    assert dtstarts == [
+             ~U[2025-05-05 14:00:00Z],
+             ~U[2025-05-12 14:00:00Z],
+             ~U[2025-05-19 14:00:00Z]
+           ]
+
+    assert Enum.all?(events, &(&1.summary == "Standup"))
+  end
+
   test "gets a single event by URL" do
     bypass = Bypass.open()
     base_url = "http://localhost:#{bypass.port}"

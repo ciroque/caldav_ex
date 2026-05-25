@@ -202,6 +202,21 @@ defmodule CalDAVEx do
   - `opts` - Optional keyword list:
     - `:from` - Start of time range (DateTime)
     - `:to` - End of time range (DateTime)
+    - `:expand_recurrences` - When `true`, instructs the CalDAV server to expand
+      recurring events into individual occurrences within the `:from`/`:to`
+      window via the `<C:expand>` element inside `<C:calendar-data>`. Both
+      `:from` and `:to` MUST be provided when this is `true`; otherwise an
+      `{:error, %CalDAVEx.Error{type: :invalid_argument}}` is returned.
+      Defaults to `false`. Note: server-side expansion depends on CalDAV
+      server support — it works well on iCloud, but behavior may vary
+      across servers.
+
+  Returned events are not guaranteed to be unique by `href` or `etag`. If a
+  single CalDAV resource's `calendar-data` contains multiple `VEVENT`
+  components, this function returns one `%CalDAVEx.Types.Event{}` per `VEVENT`,
+  even when `expand_recurrences` is `false`. For example, a recurring master
+  event and one or more `RECURRENCE-ID` override components may be returned as
+  separate list entries that share the same `href`/`etag`.
 
   ## Returns
 
@@ -222,6 +237,13 @@ defmodule CalDAVEx do
       # Get future events
       {:ok, events} = CalDAVEx.list_events(client, calendar.url,
         from: DateTime.utc_now()
+      )
+
+      # Server-side recurrence expansion (requires from and to)
+      {:ok, events} = CalDAVEx.list_events(client, calendar.url,
+        from: ~U[2025-05-01 00:00:00Z],
+        to: ~U[2025-05-31 23:59:59Z],
+        expand_recurrences: true
       )
   """
   def list_events(client, calendar_url, opts \\ []), do: Event.list(client, calendar_url, opts)

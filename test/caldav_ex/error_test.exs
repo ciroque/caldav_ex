@@ -78,6 +78,19 @@ defmodule CalDAVEx.ErrorTest do
     assert Error.to_string(error) == "[caldav_ex] Conflict"
   end
 
+  test "creates invalid_argument error" do
+    error = Error.invalid_argument("from must be a DateTime")
+    assert error.type == :invalid_argument
+    assert error.message == "from must be a DateTime"
+  end
+
+  test "converts invalid_argument error to string" do
+    error = Error.invalid_argument("from must be a DateTime")
+
+    assert Error.to_string(error) ==
+             "[caldav_ex] Invalid argument: from must be a DateTime"
+  end
+
   test "converts unknown error type to string" do
     error = %Error{type: :unknown, message: "Something went wrong"}
     assert Error.to_string(error) == "[caldav_ex] Unknown error"

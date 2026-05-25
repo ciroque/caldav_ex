@@ -3,7 +3,7 @@ defmodule CalDAVEx.Event do
   Event operations including listing, retrieval, and CRUD.
   """
 
-  alias CalDAVEx.{HTTP, Types.Event, XML}
+  alias CalDAVEx.{Error, HTTP, Types.Event, XML}
 
   # Precompiled regexes for TZID parameter extraction (performance optimization)
   # Pattern matches exact iCalendar DATE-TIME format: YYYYMMDDTHHmmss
@@ -18,23 +18,43 @@ defmodule CalDAVEx.Event do
                     )
 
   def list(client, calendar_url, opts \\ []) do
-    xml = calendar_query(opts)
+    with :ok <- validate_opts(opts),
+         xml = calendar_query(opts),
+         {:ok, %{body: body}} <-
+           HTTP.request(client, :report, calendar_url, [{"depth", "1"}], xml),
+         {:ok, responses} <- XML.parse_multistatus(body, client.config.base_url) do
+      events =
+        responses
+        |> Enum.filter(& &1.calendar_data)
+        |> Enum.flat_map(&build_events/1)
 
-    case HTTP.request(client, :report, calendar_url, [{"depth", "1"}], xml) do
-      {:ok, %{body: body}} ->
-        with {:ok, responses} <- XML.parse_multistatus(body, client.config.base_url) do
-          events =
-            responses
-            |> Enum.filter(& &1.calendar_data)
-            |> Enum.map(&build_event/1)
-
-          {:ok, events}
-        end
-
-      error ->
-        error
+      {:ok, events}
     end
   end
+
+  defp validate_opts(opts) do
+    from = Keyword.get(opts, :from)
+    to = Keyword.get(opts, :to)
+    expand? = Keyword.get(opts, :expand_recurrences, false)
+
+    cond do
+      not valid_bound?(from) ->
+        {:error, Error.invalid_argument(":from must be a %DateTime{} or nil")}
+
+      not valid_bound?(to) ->
+        {:error, Error.invalid_argument(":to must be a %DateTime{} or nil")}
+
+      expand? and (is_nil(from) or is_nil(to)) ->
+        {:error, Error.invalid_argument("expand_recurrences: true requires both :from and :to")}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp valid_bound?(nil), do: true
+  defp valid_bound?(%DateTime{}), do: true
+  defp valid_bound?(_), do: false
 
   def get(client, event_url) do
     case HTTP.request(client, :get, event_url) do
@@ -68,14 +88,17 @@ defmodule CalDAVEx.Event do
   end
 
   defp calendar_query(opts) do
-    time_range = time_range(Keyword.get(opts, :from), Keyword.get(opts, :to))
+    from = Keyword.get(opts, :from)
+    to = Keyword.get(opts, :to)
+    time_range = time_range(from, to)
+    calendar_data = calendar_data_element(opts, from, to)
 
     """
     <?xml version="1.0" encoding="UTF-8"?>
     <C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
       <D:prop>
         <D:getetag/>
-        <C:calendar-data/>
+        #{calendar_data}
       </D:prop>
       <C:filter>
         <C:comp-filter name="VCALENDAR">
@@ -85,6 +108,16 @@ defmodule CalDAVEx.Event do
     </C:calendar-query>
     """
   end
+
+  defp calendar_data_element(opts, %DateTime{} = from, %DateTime{} = to) do
+    if Keyword.get(opts, :expand_recurrences, false) do
+      "<C:calendar-data><C:expand start=\"#{format_caldav_datetime(from)}\" end=\"#{format_caldav_datetime(to)}\"/></C:calendar-data>"
+    else
+      "<C:calendar-data/>"
+    end
+  end
+
+  defp calendar_data_element(_opts, _from, _to), do: "<C:calendar-data/>"
 
   defp time_range(nil, nil), do: ""
 
@@ -105,34 +138,58 @@ defmodule CalDAVEx.Event do
     end
   end
 
-  defp build_event(response) do
-    parsed = parse_ics(response.calendar_data)
-
-    %Event{
-      href: response.href,
-      etag: response.etag,
-      calendar_data: response.calendar_data,
-      summary: parsed.summary,
-      dtstart: parsed.dtstart,
-      dtend: parsed.dtend,
-      uid: parsed.uid,
-      description: parsed.description,
-      location: parsed.location,
-      status: parsed.status,
-      rrule: parsed.rrule,
-      organizer: parsed.organizer,
-      attendees: parsed.attendees
-    }
+  defp build_events(response) do
+    response.calendar_data
+    |> parse_ics()
+    |> Enum.map(fn parsed ->
+      %Event{
+        href: response.href,
+        etag: response.etag,
+        calendar_data: response.calendar_data,
+        summary: parsed.summary,
+        dtstart: parsed.dtstart,
+        dtend: parsed.dtend,
+        uid: parsed.uid,
+        description: parsed.description,
+        location: parsed.location,
+        status: parsed.status,
+        rrule: parsed.rrule,
+        organizer: parsed.organizer,
+        attendees: parsed.attendees
+      }
+    end)
   end
 
   defp parse_ics(calendar_data) do
     case parse_calendar(calendar_data) do
-      %ICal{events: [event | _]} ->
-        extract_event_fields(event, calendar_data)
+      # Fast path: single VEVENT — no need to scan/split the resource.
+      %ICal{events: [event]} ->
+        [extract_event_fields(event, calendar_data)]
+
+      %ICal{events: [_ | _] = events} ->
+        blocks = split_vevent_blocks(calendar_data)
+
+        # Pad blocks to the events length with "" so a malformed/unsplit
+        # calendar can't leak the first VEVENT's TZID DTSTART/DTEND into
+        # sibling events. Single O(n) pass via lazy Stream.
+        events
+        |> Enum.zip(Stream.concat(blocks, Stream.cycle([""])))
+        |> Enum.map(fn {event, block} -> extract_event_fields(event, block) end)
 
       _ ->
-        empty_event_fields()
+        [empty_event_fields()]
     end
+  end
+
+  defp split_vevent_blocks(calendar_data) do
+    # iCalendar component names are case-insensitive per RFC 5545 §3.7.
+    # Anchor BEGIN:VEVENT/END:VEVENT to line boundaries so that property values
+    # legally containing the literal substring "END:VEVENT" (e.g. inside a
+    # DESCRIPTION) cannot terminate a block prematurely.
+    calendar_data
+    |> unfold_icalendar_lines()
+    |> then(&Regex.scan(~r/(?:\A|\r?\n)(BEGIN:VEVENT.*?\r?\nEND:VEVENT)(?=\r?\n|\z)/si, &1))
+    |> Enum.map(fn [_full, block | _] -> block end)
   end
 
   defp extract_event_fields(event, calendar_data) do
