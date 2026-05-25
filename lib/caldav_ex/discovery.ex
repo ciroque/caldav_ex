@@ -1,10 +1,38 @@
 defmodule CalDAVEx.Discovery do
   @moduledoc """
-  CalDAV server discovery for principal and calendar home set URLs.
+  CalDAV server discovery for principal and calendar-home-set URLs.
+
+  Implements the two-step discovery flow described in RFC 5397 and RFC 4791:
+
+    1. `PROPFIND` the base URL for `DAV:current-user-principal`.
+    2. `PROPFIND` the principal URL for `CALDAV:calendar-home-set`.
+
+  Relative `href` values returned by the server are resolved against the
+  client's configured `base_url`.
   """
 
   alias CalDAVEx.{Error, HTTP, Types.DiscoveryInfo}
 
+  @doc """
+  Discovers the principal and calendar-home-set URLs for the authenticated user.
+
+  ## Parameters
+
+    - `client` - an authenticated `%CalDAVEx.Client{}`
+
+  ## Returns
+
+    - `{:ok, %CalDAVEx.Types.DiscoveryInfo{}}` on success
+    - `{:error, %CalDAVEx.Error{}}` on transport, HTTP, XML, or protocol failures
+
+  ## Examples
+
+      {:ok, info} = CalDAVEx.Discovery.discover(client)
+      info.principal_url
+      info.calendar_home_set_url
+  """
+  @spec discover(CalDAVEx.Client.t()) ::
+          {:ok, CalDAVEx.Types.DiscoveryInfo.t()} | {:error, CalDAVEx.Error.t()}
   def discover(client) do
     with {:ok, principal} <- find_principal(client),
          {:ok, home_set} <- find_calendar_home_set(client, principal) do

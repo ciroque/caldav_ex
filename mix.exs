@@ -1,7 +1,7 @@
 defmodule CaldavEx.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.2.1"
   @source_url "https://github.com/ciroque/caldav_ex"
 
   def project do
@@ -53,7 +53,20 @@ defmodule CaldavEx.MixProject do
       main: "readme",
       extras: ["README.md", "CHANGELOG.md", "LICENSE"],
       source_ref: "v#{@version}",
-      source_url: @source_url
+      source_url: @source_url,
+      groups_for_modules: [
+        "Public API": [CalDAVEx],
+        Client: [CalDAVEx.Client, CalDAVEx.Config],
+        Operations: [CalDAVEx.Discovery, CalDAVEx.Calendar, CalDAVEx.Event],
+        Internals: [CalDAVEx.Auth, CalDAVEx.HTTP, CalDAVEx.XML],
+        Types: [
+          CalDAVEx.Types,
+          CalDAVEx.Types.Calendar,
+          CalDAVEx.Types.DiscoveryInfo,
+          CalDAVEx.Types.Event
+        ],
+        Errors: [CalDAVEx.Error]
+      ]
     ]
   end
 
