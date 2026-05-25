@@ -69,7 +69,15 @@ defmodule CalDAVEx.Types do
 
     - `href` - The full URL of the event resource
     - `etag` - Entity tag for optimistic locking
-    - `calendar_data` - Raw iCalendar (ICS) data
+    - `calendar_data` - Raw iCalendar (ICS) data for the entire CalDAV resource.
+      When a single resource contains multiple `VEVENT` components (e.g.
+      a recurring master plus `RECURRENCE-ID` overrides, or expanded
+      occurrences from `<C:expand>`), every `Event` derived from that
+      resource shares the same `calendar_data`, `href`, and `etag`. This
+      mirrors CalDAV semantics: the resource — not the occurrence — is
+      the unit of mutation. To update, `PUT` the shared `href` with the
+      full `calendar_data` (modified as needed). To delete, `DELETE` the
+      shared `href`; `calendar_data` is not sent or required.
     - `content_type` - MIME type of the calendar data
     - `summary` - Event title/summary
     - `dtstart` - Start date/time (DateTime for timed events, Date for all-day events)

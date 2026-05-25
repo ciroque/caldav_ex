@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05-25
+
+### Added
+
+- `:expand_recurrences` option on `CalDAVEx.list_events/3` (and
+  `CalDAVEx.Event.list/3`). When `true`, the calendar-query REPORT
+  emits a `<C:expand start="..." end="..."/>` element inside
+  `<C:calendar-data>` (RFC 4791 §9.6.5), instructing the server to
+  expand recurring events into individual occurrences within the
+  `:from`/`:to` window. Both bounds are required and must be
+  `%DateTime{}` structs; otherwise an
+  `{:error, %CalDAVEx.Error{type: :invalid_argument}}` is returned.
+  Server-side support varies; verified against iCloud.
+- `CalDAVEx.Error.invalid_argument/1` constructor and `:invalid_argument`
+  case in `CalDAVEx.Error.to_string/1`.
+
+### Changed
+
+- **Behavior change:** `CalDAVEx.list_events/3` now returns one
+  `%CalDAVEx.Types.Event{}` per `VEVENT` component within a CalDAV
+  resource, even when `:expand_recurrences` is `false`. Previously,
+  resources containing multiple `VEVENT`s (recurring masters with
+  `RECURRENCE-ID` overrides, or pre-expanded data) silently dropped
+  every component after the first. Returned events from the same
+  resource share the same `href`, `etag`, and `calendar_data`; the
+  resource — not the occurrence — remains the unit of mutation.
+- `CalDAVEx.Error.to_string/1` refactored to multi-clause function
+  heads (no behavior change).
+
+### Fixed
+
+- VEVENT block splitting now anchors `BEGIN:VEVENT`/`END:VEVENT` to
+  line boundaries, so property values legally containing the literal
+  substring `END:VEVENT` (e.g. inside a `DESCRIPTION`) cannot
+  terminate a block prematurely.
+- TZID DTSTART/DTEND parsing is now scoped per `VEVENT` so a TZID
+  value from one event cannot leak into another in a multi-event
+  resource.
+- `CalDAVEx.list_events/3` now validates `:from` and `:to` types
+  unconditionally and returns
+  `{:error, %CalDAVEx.Error{type: :invalid_argument}}` for non-`DateTime`
+  values, instead of crashing with `FunctionClauseError` deep in the
+  query-formatting path.
+
 ## [0.1.4] - 2026-05-21
 
 ### Fixed
@@ -75,3 +119,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.1.0]: https://github.com/ciroque/caldav_ex/releases/tag/v0.1.0
 [0.1.4]: https://github.com/ciroque/caldav_ex/releases/tag/v0.1.4
+[0.2.0]: https://github.com/ciroque/caldav_ex/releases/tag/v0.2.0

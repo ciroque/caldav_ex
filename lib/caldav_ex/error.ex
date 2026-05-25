@@ -10,7 +10,7 @@ defmodule CalDAVEx.Error do
 
   ## Fields
 
-  - `type` - The error type (`:transport`, `:http`, `:xml`, `:protocol`, `:not_found`, `:unauthorized`, `:conflict`)
+  - `type` - The error type (`:transport`, `:http`, `:xml`, `:protocol`, `:not_found`, `:unauthorized`, `:conflict`, `:invalid_argument`)
   - `message` - Human-readable error message
   - `details` - Additional error details (optional)
   """
@@ -43,6 +43,9 @@ defmodule CalDAVEx.Error do
   @doc "Creates a conflict error (HTTP 409)"
   def conflict, do: %__MODULE__{type: :conflict}
 
+  @doc "Creates an invalid-argument error (caller-side validation failure)"
+  def invalid_argument(msg), do: %__MODULE__{type: :invalid_argument, message: msg}
+
   @doc """
   Converts an error to a human-readable string.
 
@@ -52,17 +55,21 @@ defmodule CalDAVEx.Error do
       CalDAVEx.Error.to_string(error)
       # => "[caldav_ex] HTTP error: HTTP 404 - Not found"
   """
-  def to_string(%__MODULE__{} = e) do
-    "[caldav_ex] " <>
-      case e.type do
-        :transport -> "Transport error: #{e.message}"
-        :http -> "HTTP error: #{e.message} - #{e.details}"
-        :xml -> "XML error: #{e.message}"
-        :protocol -> "Protocol error: #{e.message}"
-        :not_found -> "Not found"
-        :unauthorized -> "Unauthorized"
-        :conflict -> "Conflict"
-        _ -> "Unknown error"
-      end
-  end
+  def to_string(%__MODULE__{} = e), do: "[caldav_ex] " <> describe(e)
+
+  defp describe(%__MODULE__{type: :transport, message: msg}), do: "Transport error: #{msg}"
+
+  defp describe(%__MODULE__{type: :http, message: msg, details: details}),
+    do: "HTTP error: #{msg} - #{details}"
+
+  defp describe(%__MODULE__{type: :xml, message: msg}), do: "XML error: #{msg}"
+  defp describe(%__MODULE__{type: :protocol, message: msg}), do: "Protocol error: #{msg}"
+  defp describe(%__MODULE__{type: :not_found}), do: "Not found"
+  defp describe(%__MODULE__{type: :unauthorized}), do: "Unauthorized"
+  defp describe(%__MODULE__{type: :conflict}), do: "Conflict"
+
+  defp describe(%__MODULE__{type: :invalid_argument, message: msg}),
+    do: "Invalid argument: #{msg}"
+
+  defp describe(%__MODULE__{}), do: "Unknown error"
 end
