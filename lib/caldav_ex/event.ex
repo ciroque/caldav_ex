@@ -14,6 +14,17 @@ defmodule CalDAVEx.Event do
 
   alias CalDAVEx.{Error, HTTP, Types.Event, XML}
 
+  @typedoc """
+  Options accepted by `list/3`.
+  """
+  @type list_opt ::
+          {:from, DateTime.t() | nil}
+          | {:to, DateTime.t() | nil}
+          | {:expand_recurrences, boolean()}
+
+  @typedoc "Keyword list of `t:list_opt/0` values."
+  @type list_opts :: [list_opt()]
+
   # Precompiled regexes for TZID parameter extraction (performance optimization)
   # Pattern matches exact iCalendar DATE-TIME format: YYYYMMDDTHHmmss
   @dtstart_tzid_regex Regex.compile!(
@@ -60,6 +71,8 @@ defmodule CalDAVEx.Event do
         to: ~U[2025-05-31 23:59:59Z]
       )
   """
+  @spec list(CalDAVEx.Client.t(), String.t(), list_opts()) ::
+          {:ok, [Event.t()]} | {:error, CalDAVEx.Error.t()}
   def list(client, calendar_url, opts \\ []) do
     with :ok <- validate_opts(opts),
          xml = calendar_query(opts),
@@ -117,6 +130,8 @@ defmodule CalDAVEx.Event do
     - `{:ok, %CalDAVEx.Types.Event{}}` on success
     - `{:error, %CalDAVEx.Error{}}` on failure
   """
+  @spec get(CalDAVEx.Client.t(), String.t()) ::
+          {:ok, Event.t()} | {:error, CalDAVEx.Error.t()}
   def get(client, event_url) do
     case HTTP.request(client, :get, event_url) do
       {:ok, %{body: body, headers: headers}} ->
@@ -146,6 +161,8 @@ defmodule CalDAVEx.Event do
     - `{:ok, %CalDAVEx.Types.Event{href: url}}` on success
     - `{:error, %CalDAVEx.Error{}}` on failure
   """
+  @spec create(CalDAVEx.Client.t(), String.t(), String.t(), iodata()) ::
+          {:ok, Event.t()} | {:error, CalDAVEx.Error.t()}
   def create(client, calendar_url, filename, ics_data) do
     url = String.trim_trailing(calendar_url, "/") <> "/" <> filename
     headers = [{"if-none-match", "*"}]
@@ -172,9 +189,11 @@ defmodule CalDAVEx.Event do
 
   ## Returns
 
-    - `{:ok, %{status: integer, body: term, headers: list}}` on success
+    - `{:ok, %{status: non_neg_integer, body: term, headers: map}}` on success
     - `{:error, %CalDAVEx.Error{}}` on HTTP, transport, or ETag-mismatch (`412`) failures
   """
+  @spec update(CalDAVEx.Client.t(), String.t(), iodata(), String.t() | nil) ::
+          {:ok, CalDAVEx.HTTP.response()} | {:error, CalDAVEx.Error.t()}
   def update(client, event_url, ics_data, etag) do
     headers = if etag, do: [{"if-match", etag}], else: []
     HTTP.request(client, :put, event_url, headers, ics_data)
@@ -194,9 +213,11 @@ defmodule CalDAVEx.Event do
 
   ## Returns
 
-    - `{:ok, %{status: integer, body: term, headers: list}}` on success
+    - `{:ok, %{status: non_neg_integer, body: term, headers: map}}` on success
     - `{:error, %CalDAVEx.Error{}}` on HTTP, transport, or ETag-mismatch (`412`) failures
   """
+  @spec delete(CalDAVEx.Client.t(), String.t(), String.t() | nil) ::
+          {:ok, CalDAVEx.HTTP.response()} | {:error, CalDAVEx.Error.t()}
   def delete(client, event_url, etag) do
     headers = if etag, do: [{"if-match", etag}], else: []
     HTTP.request(client, :delete, event_url, headers)

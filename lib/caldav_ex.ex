@@ -52,6 +52,7 @@ defmodule CalDAVEx do
 
       config = CalDAVEx.new_config("http://localhost:8080", CalDAVEx.no_auth())
   """
+  @spec no_auth() :: CalDAVEx.Config.auth()
   def no_auth, do: :no_auth
 
   @doc """
@@ -67,6 +68,7 @@ defmodule CalDAVEx do
       auth = CalDAVEx.basic_auth("user@example.com", "secret")
       config = CalDAVEx.new_config("https://caldav.example.com", auth)
   """
+  @spec basic_auth(String.t(), String.t()) :: CalDAVEx.Config.auth()
   def basic_auth(username, password), do: {:basic, username, password}
 
   @doc """
@@ -81,6 +83,7 @@ defmodule CalDAVEx do
       auth = CalDAVEx.bearer_auth("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
       config = CalDAVEx.new_config("https://caldav.example.com", auth)
   """
+  @spec bearer_auth(String.t()) :: CalDAVEx.Config.auth()
   def bearer_auth(token), do: {:bearer, token}
 
   @doc """
@@ -98,6 +101,7 @@ defmodule CalDAVEx do
         CalDAVEx.basic_auth("user@icloud.com", "app-specific-password")
       )
   """
+  @spec new_config(String.t(), CalDAVEx.Config.auth()) :: CalDAVEx.Config.t()
   def new_config(base_url, auth), do: Config.new(base_url, auth)
 
   @doc """
@@ -113,6 +117,7 @@ defmodule CalDAVEx do
       config
       |> CalDAVEx.with_user_agent("MyApp/1.0")
   """
+  @spec with_user_agent(CalDAVEx.Config.t(), String.t()) :: CalDAVEx.Config.t()
   def with_user_agent(config, ua), do: Config.with_user_agent(config, ua)
 
   @doc """
@@ -128,6 +133,7 @@ defmodule CalDAVEx do
       config
       |> CalDAVEx.with_timeout(30_000)
   """
+  @spec with_timeout(CalDAVEx.Config.t(), non_neg_integer()) :: CalDAVEx.Config.t()
   def with_timeout(config, ms), do: Config.with_timeout(config, ms)
 
   @doc """
@@ -142,6 +148,7 @@ defmodule CalDAVEx do
       config = CalDAVEx.new_config(base_url, auth)
       client = CalDAVEx.new_client(config)
   """
+  @spec new_client(CalDAVEx.Config.t()) :: CalDAVEx.Client.t()
   def new_client(config), do: Client.new(config)
 
   @doc """
@@ -166,6 +173,8 @@ defmodule CalDAVEx do
       IO.inspect(discovery_info.principal_url)
       IO.inspect(discovery_info.calendar_home_set_url)
   """
+  @spec discover(CalDAVEx.Client.t()) ::
+          {:ok, CalDAVEx.Types.DiscoveryInfo.t()} | {:error, CalDAVEx.Error.t()}
   def discover(client), do: Discovery.discover(client)
 
   @doc """
@@ -190,6 +199,8 @@ defmodule CalDAVEx do
         IO.puts("Calendar: \#{cal.display_name} - \#{cal.url}")
       end)
   """
+  @spec list_calendars(CalDAVEx.Client.t(), CalDAVEx.Types.DiscoveryInfo.t()) ::
+          {:ok, [CalDAVEx.Types.Calendar.t()]} | {:error, CalDAVEx.Error.t()}
   def list_calendars(client, discovery_info), do: Calendar.list(client, discovery_info)
 
   @doc """
@@ -246,6 +257,8 @@ defmodule CalDAVEx do
         expand_recurrences: true
       )
   """
+  @spec list_events(CalDAVEx.Client.t(), String.t(), CalDAVEx.Event.list_opts()) ::
+          {:ok, [CalDAVEx.Types.Event.t()]} | {:error, CalDAVEx.Error.t()}
   def list_events(client, calendar_url, opts \\ []), do: Event.list(client, calendar_url, opts)
 
   @doc """
@@ -266,6 +279,8 @@ defmodule CalDAVEx do
       {:ok, event} = CalDAVEx.get_event(client, "https://caldav.example.com/cal/event.ics")
       IO.inspect(event.calendar_data)
   """
+  @spec get_event(CalDAVEx.Client.t(), String.t()) ::
+          {:ok, CalDAVEx.Types.Event.t()} | {:error, CalDAVEx.Error.t()}
   def get_event(client, event_url), do: Event.get(client, event_url)
 
   @doc """
@@ -280,6 +295,8 @@ defmodule CalDAVEx do
   - `filename` - The filename for the event (e.g., "event.ics")
   - `ics_data` - The iCalendar data as a string
   """
+  @spec create_event(CalDAVEx.Client.t(), String.t(), String.t(), iodata()) ::
+          {:ok, CalDAVEx.Types.Event.t()} | {:error, CalDAVEx.Error.t()}
   def create_event(client, calendar_url, filename, ics_data),
     do: Event.create(client, calendar_url, filename, ics_data)
 
@@ -295,6 +312,8 @@ defmodule CalDAVEx do
   - `ics_data` - The updated iCalendar data
   - `etag` - Optional ETag for optimistic locking
   """
+  @spec update_event(CalDAVEx.Client.t(), String.t(), iodata(), String.t() | nil) ::
+          {:ok, CalDAVEx.HTTP.response()} | {:error, CalDAVEx.Error.t()}
   def update_event(client, event_url, ics_data, etag \\ nil),
     do: Event.update(client, event_url, ics_data, etag)
 
@@ -309,6 +328,8 @@ defmodule CalDAVEx do
   - `event_url` - The URL of the event
   - `etag` - Optional ETag for optimistic locking
   """
+  @spec delete_event(CalDAVEx.Client.t(), String.t(), String.t() | nil) ::
+          {:ok, CalDAVEx.HTTP.response()} | {:error, CalDAVEx.Error.t()}
   def delete_event(client, event_url, etag \\ nil),
     do: Event.delete(client, event_url, etag)
 
@@ -326,5 +347,6 @@ defmodule CalDAVEx do
         {:error, error} -> IO.puts(CalDAVEx.error_to_string(error))
       end
   """
+  @spec error_to_string(CalDAVEx.Error.t()) :: String.t()
   def error_to_string(error), do: Error.to_string(error)
 end

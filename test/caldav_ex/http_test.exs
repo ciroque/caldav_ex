@@ -109,6 +109,22 @@ defmodule CalDAVEx.HTTPTest do
     assert {:ok, _} = HTTP.request(client, :get, base_url)
   end
 
+  test "falls back to default user agent when config struct has nil user_agent" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+    default_ua = CalDAVEx.Config.default_user_agent()
+
+    Bypass.expect_once(bypass, fn conn ->
+      assert [^default_ua] = Plug.Conn.get_req_header(conn, "user-agent")
+      Plug.Conn.resp(conn, 200, "")
+    end)
+
+    config = %CalDAVEx.Config{base_url: base_url, auth: :no_auth, user_agent: nil}
+    client = CalDAVEx.new_client(config)
+
+    assert {:ok, _} = HTTP.request(client, :get, base_url)
+  end
+
   test "includes basic auth header" do
     bypass = Bypass.open()
     base_url = "http://localhost:#{bypass.port}"

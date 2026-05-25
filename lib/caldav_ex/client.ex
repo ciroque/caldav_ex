@@ -7,6 +7,13 @@ defmodule CalDAVEx.Client do
   top-level `CalDAVEx.new_client/1` helper.
   """
 
+  @typedoc """
+  CalDAV client struct.
+  """
+  @type t :: %__MODULE__{
+          config: CalDAVEx.Config.t()
+        }
+
   defstruct [:config]
 
   @doc """
@@ -21,5 +28,6 @@ defmodule CalDAVEx.Client do
       config = CalDAVEx.new_config("https://caldav.example.com", CalDAVEx.no_auth())
       client = CalDAVEx.Client.new(config)
   """
+  @spec new(CalDAVEx.Config.t()) :: t()
   def new(config), do: %__MODULE__{config: config}
 end

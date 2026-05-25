@@ -8,8 +8,7 @@ defmodule CalDAVEx.ConfigTest do
 
     assert config.base_url == "https://caldav.example.com"
     assert config.auth == :no_auth
-    {:ok, vsn} = :application.get_key(:caldav_ex, :vsn)
-    assert config.user_agent == "caldav_ex/" <> List.to_string(vsn)
+    assert config.user_agent == Config.default_user_agent()
     assert config.timeout_ms == 10_000
   end
 

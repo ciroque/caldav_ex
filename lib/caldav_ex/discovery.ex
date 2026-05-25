@@ -31,6 +31,8 @@ defmodule CalDAVEx.Discovery do
       info.principal_url
       info.calendar_home_set_url
   """
+  @spec discover(CalDAVEx.Client.t()) ::
+          {:ok, CalDAVEx.Types.DiscoveryInfo.t()} | {:error, CalDAVEx.Error.t()}
   def discover(client) do
     with {:ok, principal} <- find_principal(client),
          {:ok, home_set} <- find_calendar_home_set(client, principal) do

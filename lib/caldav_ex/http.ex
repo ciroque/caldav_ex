@@ -10,6 +10,24 @@ defmodule CalDAVEx.HTTP do
   `{:ok, %{status, body, headers}}` or `{:error, %CalDAVEx.Error{}}`.
   """
 
+  @typedoc """
+  HTTP / WebDAV / CalDAV method.
+
+  The convenience atoms `:propfind`, `:proppatch`, `:mkcalendar`, and
+  `:report` are translated to their uppercase string equivalents before
+  being passed to `Req`. Standard HTTP method atoms (`:get`, `:put`,
+  `:delete`, ...) and raw string methods (e.g. `"PATCH"`) are passed
+  through verbatim.
+  """
+  @type method :: atom() | String.t()
+
+  @typedoc "Successful response payload."
+  @type response :: %{
+          status: non_neg_integer(),
+          body: term(),
+          headers: %{optional(binary()) => [binary()]}
+        }
+
   @doc """
   Issues a single HTTP request against a CalDAV server.
 
@@ -24,10 +42,17 @@ defmodule CalDAVEx.HTTP do
 
   ## Returns
 
-    - `{:ok, %{status: integer, body: term, headers: list}}` for 2xx responses
+    - `{:ok, %{status: non_neg_integer, body: term, headers: map}}` for 2xx responses
     - `{:error, %CalDAVEx.Error{type: :http}}` for non-2xx responses
     - `{:error, %CalDAVEx.Error{type: :transport}}` for connection/transport failures
   """
+  @spec request(
+          CalDAVEx.Client.t(),
+          method(),
+          String.t(),
+          [{String.t(), String.t()}],
+          iodata() | nil
+        ) :: {:ok, response()} | {:error, CalDAVEx.Error.t()}
   def request(client, method, url, headers \\ [], body \\ nil) do
     cfg = client.config
 

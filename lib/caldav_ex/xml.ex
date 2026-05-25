@@ -15,6 +15,20 @@ defmodule CalDAVEx.XML do
 
   alias CalDAVEx.Error
 
+  @typedoc """
+  Parsed `D:response` element, with the most commonly-requested CalDAV
+  properties extracted into a flat map.
+  """
+  @type response :: %{
+          href: String.t() | nil,
+          display_name: String.t() | nil,
+          description: String.t() | nil,
+          ctag: String.t() | nil,
+          etag: String.t() | nil,
+          calendar_data: String.t() | nil,
+          is_calendar: boolean()
+        }
+
   @doc """
   Parses a WebDAV/CalDAV `D:multistatus` XML body.
 
@@ -29,6 +43,8 @@ defmodule CalDAVEx.XML do
       `:description`, `:ctag`, `:etag`, `:calendar_data`, and `:is_calendar`
     - `{:error, %CalDAVEx.Error{type: :xml}}` if the body is not well-formed XML
   """
+  @spec parse_multistatus(String.t(), String.t()) ::
+          {:ok, [response()]} | {:error, CalDAVEx.Error.t()}
   def parse_multistatus(body, base_url) do
     case Saxy.SimpleForm.parse_string(body, cdata_as_characters: true) do
       {:ok, document} ->

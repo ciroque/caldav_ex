@@ -8,6 +8,28 @@ defmodule CalDAVEx.Config do
   around these functions for the common case.
   """
 
+  @typedoc """
+  Authentication configuration.
+
+  - `:no_auth` - no authentication header
+  - `{:basic, username, password}` - HTTP Basic
+  - `{:bearer, token}` - Bearer token
+  """
+  @type auth ::
+          :no_auth
+          | {:basic, String.t(), String.t()}
+          | {:bearer, String.t()}
+
+  @typedoc """
+  CalDAV client configuration struct.
+  """
+  @type t :: %__MODULE__{
+          base_url: String.t(),
+          auth: auth(),
+          user_agent: String.t() | nil,
+          timeout_ms: non_neg_integer()
+        }
+
   defstruct [:base_url, :auth, :user_agent, timeout_ms: 10_000]
 
   @doc """
@@ -29,6 +51,7 @@ defmodule CalDAVEx.Config do
         CalDAVEx.basic_auth("user", "pass")
       )
   """
+  @spec new(String.t(), auth()) :: t()
   def new(base_url, auth) when is_binary(base_url) do
     %__MODULE__{
       base_url: String.trim_trailing(base_url, "/"),
@@ -50,6 +73,7 @@ defmodule CalDAVEx.Config do
 
     - the default User-Agent string (e.g. `"caldav_ex/0.2.1"`)
   """
+  @spec default_user_agent() :: String.t()
   def default_user_agent do
     case :application.get_key(:caldav_ex, :vsn) do
       {:ok, vsn} -> "caldav_ex/" <> List.to_string(vsn)
@@ -73,6 +97,7 @@ defmodule CalDAVEx.Config do
 
       config |> CalDAVEx.Config.with_user_agent("MyApp/1.0")
   """
+  @spec with_user_agent(t(), String.t()) :: t()
   def with_user_agent(%__MODULE__{} = cfg, ua), do: %{cfg | user_agent: ua}
 
   @doc """
@@ -93,6 +118,7 @@ defmodule CalDAVEx.Config do
 
       config |> CalDAVEx.Config.with_timeout(30_000)
   """
+  @spec with_timeout(t(), non_neg_integer()) :: t()
   def with_timeout(%__MODULE__{} = cfg, ms) when is_integer(ms) and ms >= 0,
     do: %{cfg | timeout_ms: ms}
 end

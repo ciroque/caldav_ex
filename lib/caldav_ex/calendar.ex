@@ -29,6 +29,8 @@ defmodule CalDAVEx.Calendar do
       {:ok, info} = CalDAVEx.discover(client)
       {:ok, calendars} = CalDAVEx.Calendar.list(client, info)
   """
+  @spec list(CalDAVEx.Client.t(), CalDAVEx.Types.DiscoveryInfo.t()) ::
+          {:ok, [CalDAVEx.Types.Calendar.t()]} | {:error, CalDAVEx.Error.t()}
   def list(client, discovery_info) do
     xml = """
     <?xml version="1.0" encoding="UTF-8"?>

@@ -27,6 +27,7 @@ defmodule CalDAVEx.Auth do
       iex> CalDAVEx.Auth.to_headers({:bearer, "abc"})
       [{"authorization", "Bearer abc"}]
   """
+  @spec to_headers(CalDAVEx.Config.auth()) :: [{String.t(), String.t()}]
   def to_headers(:no_auth), do: []
 
   def to_headers({:basic, username, password}) do
