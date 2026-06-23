@@ -71,7 +71,7 @@ defmodule CalDAVEx.Config do
 
   ## Returns
 
-    - the default User-Agent string (e.g. `"caldav_ex/0.2.1"`)
+    - the default User-Agent string (e.g. `"caldav_ex/0.2.2"`)
   """
   @spec default_user_agent() :: String.t()
   def default_user_agent do
