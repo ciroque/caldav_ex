@@ -43,16 +43,18 @@ defmodule CalDAVEx.Types do
     - `description` - Optional description of the calendar
     - `ctag` - Calendar collection tag for sync purposes
     - `is_calendar` - Whether this resource is a calendar (has C:calendar resourcetype)
+    - `color` - Calendar color as a hex string (e.g. `"#FF2D55FF"`), if provided by the server
     """
     @type t :: %__MODULE__{
             url: String.t(),
             display_name: String.t() | nil,
             description: String.t() | nil,
             ctag: String.t() | nil,
-            is_calendar: boolean()
+            is_calendar: boolean(),
+            color: String.t() | nil
           }
 
-    defstruct [:url, :display_name, :description, :ctag, :is_calendar]
+    defstruct [:url, :display_name, :description, :ctag, :is_calendar, :color]
   end
 
   defmodule Event do

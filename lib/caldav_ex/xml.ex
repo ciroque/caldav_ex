@@ -26,7 +26,8 @@ defmodule CalDAVEx.XML do
           ctag: String.t() | nil,
           etag: String.t() | nil,
           calendar_data: String.t() | nil,
-          is_calendar: boolean()
+          is_calendar: boolean(),
+          color: String.t() | nil
         }
 
   @doc """
@@ -40,7 +41,7 @@ defmodule CalDAVEx.XML do
   ## Returns
 
     - `{:ok, [map]}` - a list of maps with keys `:href`, `:display_name`,
-      `:description`, `:ctag`, `:etag`, `:calendar_data`, and `:is_calendar`
+      `:description`, `:ctag`, `:etag`, `:calendar_data`, `:is_calendar`, and `:color`
     - `{:error, %CalDAVEx.Error{type: :xml}}` if the body is not well-formed XML
   """
   @spec parse_multistatus(String.t(), String.t()) ::
@@ -70,7 +71,8 @@ defmodule CalDAVEx.XML do
       ctag: prop_text(successful_props, "getctag"),
       etag: prop_text(successful_props, "getetag"),
       calendar_data: prop_text(successful_props, "calendar-data"),
-      is_calendar: has_calendar_resourcetype?(successful_props)
+      is_calendar: has_calendar_resourcetype?(successful_props),
+      color: prop_text(successful_props, "calendar-color")
     }
   end
 

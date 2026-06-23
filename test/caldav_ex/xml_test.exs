@@ -287,4 +287,45 @@ defmodule CalDAVEx.XMLTest do
     assert {:ok, [response]} = XML.parse_multistatus(xml, "https://caldav.example.com")
     assert response.description == "My work calendar"
   end
+
+  test "parses calendar-color from Apple namespace" do
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:AAPL="http://apple.com/ns/ical/">
+      <D:response>
+        <D:href>/calendars/user/work/</D:href>
+        <D:propstat>
+          <D:prop>
+            <D:displayname>Work</D:displayname>
+            <AAPL:calendar-color>#FF2D55FF</AAPL:calendar-color>
+          </D:prop>
+          <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+      </D:response>
+    </D:multistatus>
+    """
+
+    assert {:ok, [response]} = XML.parse_multistatus(xml, "https://caldav.example.com")
+    assert response.color == "#FF2D55FF"
+  end
+
+  test "color is nil when calendar-color property is absent" do
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      <D:response>
+        <D:href>/calendars/user/work/</D:href>
+        <D:propstat>
+          <D:prop>
+            <D:displayname>Work</D:displayname>
+          </D:prop>
+          <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+      </D:response>
+    </D:multistatus>
+    """
+
+    assert {:ok, [response]} = XML.parse_multistatus(xml, "https://caldav.example.com")
+    assert response.color == nil
+  end
 end

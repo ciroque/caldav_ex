@@ -157,6 +157,78 @@ defmodule CalDAVEx.CalendarTest do
     assert [%Calendar{display_name: "Personal", is_calendar: true}] = calendars
   end
 
+  test "requests calendar-color in PROPFIND body" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      assert body =~ "calendar-color"
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    discovery_info = %DiscoveryInfo{
+      principal_url: base_url <> "/principals/user/",
+      calendar_home_set_url: base_url <> "/calendars/user/"
+    }
+
+    assert {:ok, _} = CalDAVEx.Calendar.list(client, discovery_info)
+  end
+
+  test "maps calendar-color from response to color field on Calendar struct" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}"
+
+    Bypass.expect_once(bypass, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/xml")
+      |> Plug.Conn.resp(207, """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:AAPL="http://apple.com/ns/ical/">
+        <D:response>
+          <D:href>/calendars/user/personal/</D:href>
+          <D:propstat>
+            <D:prop>
+              <D:displayname>Personal</D:displayname>
+              <AAPL:calendar-color>#FF2D55FF</AAPL:calendar-color>
+              <D:resourcetype>
+                <D:collection/>
+                <C:calendar/>
+              </D:resourcetype>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+          </D:propstat>
+        </D:response>
+      </D:multistatus>
+      """)
+    end)
+
+    client =
+      base_url
+      |> CalDAVEx.new_config(CalDAVEx.no_auth())
+      |> CalDAVEx.new_client()
+
+    discovery_info = %DiscoveryInfo{
+      principal_url: base_url <> "/principals/user/",
+      calendar_home_set_url: base_url <> "/calendars/user/"
+    }
+
+    assert {:ok, [calendar]} = CalDAVEx.Calendar.list(client, discovery_info)
+    assert calendar.color == "#FF2D55FF"
+  end
+
   test "filters out responses without href" do
     bypass = Bypass.open()
     base_url = "http://localhost:#{bypass.port}"
