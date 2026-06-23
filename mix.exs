@@ -26,6 +26,7 @@ defmodule CaldavEx.MixProject do
       {:saxy, "~> 1.5"},
       {:ical, "~> 2.0"},
       {:tz, "~> 0.28.1"},
+      {:cowlib, ">= 2.16.1 and < 3.0.0", only: :test},
       {:bypass, "~> 2.1", only: :test},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
