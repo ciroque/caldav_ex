@@ -9,9 +9,9 @@ defmodule CalDAVEx.Calendar do
   Lists all calendars under the user's calendar-home-set.
 
   Issues a `PROPFIND` with `Depth: 1` requesting `displayname`,
-  `calendar-description`, `getctag`, and `resourcetype` for each child
-  resource, then filters the multistatus response to entries whose
-  `resourcetype` includes `CALDAV:calendar`.
+  `calendar-description`, `getctag`, `resourcetype`, and `calendar-color`
+  for each child resource, then filters the multistatus response to entries
+  whose `resourcetype` includes `CALDAV:calendar`.
 
   ## Parameters
 
@@ -34,12 +34,13 @@ defmodule CalDAVEx.Calendar do
   def list(client, discovery_info) do
     xml = """
     <?xml version="1.0" encoding="UTF-8"?>
-    <D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:CS="http://calendarserver.org/ns/">
+    <D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:CS="http://calendarserver.org/ns/" xmlns:AAPL="http://apple.com/ns/ical/">
       <D:prop>
         <D:displayname/>
         <C:calendar-description/>
         <CS:getctag/>
         <D:resourcetype/>
+        <AAPL:calendar-color/>
       </D:prop>
     </D:propfind>
     """
@@ -70,7 +71,8 @@ defmodule CalDAVEx.Calendar do
       display_name: response.display_name,
       description: response.description,
       ctag: response.ctag,
-      is_calendar: response.is_calendar
+      is_calendar: response.is_calendar,
+      color: response.color
     }
   end
 end
